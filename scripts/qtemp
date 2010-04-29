@@ -2,7 +2,7 @@
 
 # Use perldoc or option --man to read documentation
 
-our $VERSION = 0.5;
+our $VERSION = 0.05;
 
 # TODO: When substitution lookup otherwise fails, attempt to lookup in
 # %ENV. This could be extremely useful.

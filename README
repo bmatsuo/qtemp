@@ -1,16 +1,9 @@
-qtemp version 0.01
+qtemp version 0.05
 ==========================
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
-
-A README file is required for CPAN modules since CPAN extracts the
-README file from a module distribution so that people browsing the
-archive can use it get an idea of the modules uses. It is usually a
-good idea to provide version information here so that people can
-decide whether fixes for the module are worth downloading.
+This program is designed to run on Mac OS X and Linux. I suspect that
+there will be problems on Windows due to carriage returns. There has just
+never been any testing on Windows.
 
 INSTALLATION
 
@@ -23,15 +16,14 @@ To install this module type the following:
 
 DEPENDENCIES
 
-This module requires these other modules and libraries:
+This module requires these CPAN modules and libraries (www.cpan.org):
 
-  blah blah blah
+    Getopt::Euclid
+    Readonly
 
 COPYRIGHT AND LICENCE
 
-Put the correct copyright and licence information here.
-
-Copyright (C) 2010 by bryan
+Copyright (C) 2010 by Bryan Matsuo
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.10.0 or,
