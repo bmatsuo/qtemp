@@ -2,6 +2,7 @@ Changes
 Makefile.PL
 MANIFEST
 README
+INSTALL
 t/QuickTemplate.t
 t/QuickTemplate-Parser.t
 t/QuickTemplate-Generator.t
