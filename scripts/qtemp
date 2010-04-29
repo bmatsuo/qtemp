@@ -1,0 +1,621 @@
+#!/usr/bin/env perl
+
+# Use perldoc or option --man to read documentation
+
+our $VERSION = 0.5;
+
+# TODO: When substitution lookup otherwise fails, attempt to lookup in
+# %ENV. This could be extremely useful.
+
+# TODO: add documentation to the .qtemp template format
+#   Then add options to view documentation and search the template
+#   library.
+
+# TODO: classify objects in this program.
+#   - QTemp::SubstitutionTable
+#   - QTemp::Template
+#   - QTemp::Template::Parser
+
+# Include some core modules.
+use strict;
+use warnings;
+use File::Basename;
+use English;
+use Carp;
+use File::Glob;
+use POSIX qw(strftime); 
+use Time::Local; 
+
+# Include some CPAN modules;
+use Getopt::Euclid qw{ :vars<opt_> };
+# I should probably remove Readonly.
+use Readonly; 
+
+use File::QuickTemplate::Parser;
+use File::QuickTemplate::Generator;
+
+# Fetch some basic program information
+Readonly my $prog_incantation  => $0;
+Readonly my $prog_dir          => dirname($0);
+Readonly my $prog_name         => basename($0);
+
+########################################################################
+# GLOBAL VARIABLES
+########################################################################
+
+my $exitcode = 0;   # Program exitcode.
+my %opt = %ARGV;    # Command line options/arguments.
+
+
+########################################################################
+# CONSTANTS
+########################################################################
+
+
+# A temporary fix until I figure out MakeMaker (DON'T USE "~")
+Readonly my $PREFIX                     => '/home/bryan';
+Readonly my $BIN_DIR                    => $PREFIX.'/bin';
+Readonly my $SUPPORT_DIR                => $PREFIX.'/share/qtemp';
+# Template file extension.
+Readonly my $template_ext               => 'qtemp';
+# Substitution file extension.
+Readonly my $subs_ext                   => 'subs';
+# Template file partition seperator.
+Readonly my $template_script_separator  => '!!';
+# Default template directory
+Readonly my $template_dir               => $SUPPORT_DIR.'/templates';
+# Default substitution file directory
+Readonly my $subs_dir                   => $SUPPORT_DIR.'/subs';
+# User local qtemp directory
+Readonly my $user_qtemp_dir             
+    => ($ENV{'HOME'} || $ENV{'LOGDIR'} || getpwuid $EUID).'/.qtemp';
+# Create a list of search locations for templates.
+Readonly my @template_base_search_locations  
+    => ("$user_qtemp_dir/templates", $template_dir);
+# Do the same for substitution files
+Readonly my @subs_base_search_locations
+    => ("$user_qtemp_dir/subs", $subs_dir);
+
+########################################################################
+# MAIN FUNCTION
+########################################################################
+
+
+# Subroutine: main()
+# Type: INTERFACE SUB
+# Purpose:
+#   This subroutine represents the main control thread of the program.
+#   Aside from setup of global variables, actual com
+# Returns: 
+#   Does not return. Exit is called after all other commands.
+sub main {
+    # Make the substitution table.
+    my %sub = mk_substitution_table();
+
+    # Find the template.
+    my $tmpl_fh = find_and_open_template($opt_template_name);
+  
+    # Open the output filehandle.
+    my $dest_fh = output_filehandle($opt_output);
+    
+    # Print the template w/ substitution.
+    print_subbed_template($tmpl_fh, \%sub, $dest_fh);
+
+    # Close the output filehandle.
+    close $dest_fh;
+
+    # Perform extra script actions if output is not standard output.
+    execute_template_script($tmpl_fh, \%sub, $dest_fh) 
+        if !($opt_output eq '-');
+
+    # Close the template filehandle.
+    close $tmpl_fh;
+
+    exit($exitcode);
+}
+
+########################################################################
+# SUPPORTING SUBROUTINES
+########################################################################
+
+# Subroutine: mk_substitution_table()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Load defaults, user defined subs files and command line specified
+#   substitutions in that order (last loaded is highest priority).
+# Returns: A new hash containing all substitutions
+sub mk_substitution_table {
+    # Find all substition definition files.
+    my @sub_files = find_subs_files();
+
+    # Handle command-line specified substitutions.
+    my @opt_subs = @{$opt{'--add-substitution'} || []};
+
+    # Turn each option's hash ref into a one element hash; pattern=>sub.
+    my %cmd_line_subs = map { ($_->{'pattern'}, $_->{'sub'}) } @opt_subs;
+
+    # Create substitution table.
+    my %sub 
+        =   ( 
+            default_subs(), 
+            parse_subs_files(@sub_files),
+            %cmd_line_subs,
+            );
+
+    # Return substitution table
+    return %sub;
+}
+
+# Subroutine: subdirectories_of($dir,$recursive)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Find all subdirecties in directory $dir.
+# Returns: List
+#   A list of all direct subdirectories of dir.
+#   If $recursive evaluates TRUE in a boolean context then the list of
+#   relative paths to all directories descendent of $dir is returned.
+sub subdirectories_of {
+    my ($dir, $recursive) = @_;
+
+    # Find direct subdirs of $dir
+    my @subdirs = grep {-d $_} glob "$dir/*";
+
+    if ($recursive) {
+        # Recur on every direct subdir of $dir.
+        for my $subdir (@subdirs) {
+            push @subdirs, subdirectories_of($subdir, $recursive);
+        }
+    }
+
+    # Return the found list of directories.
+    return @subdirs;
+}
+
+# Subroutine: rec_subdirs_of(@dirs)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Gather a recursive directory list of multiple files.
+# Returns: List
+#   Concatenated recursive lists of subdirectories for each directory in
+#   @dirs.
+sub rec_subdirs_of {
+    my @dirs = @_;
+
+    return map {subdirectories_of($_,1)} @dirs;
+}
+
+# Subroutine: subs_search_locations()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Create recursive list of all directories inside the base
+#   substitution file lookup directories.
+# Returns: List
+#   Described in 'Purpose'.
+sub subs_search_locations {
+    return
+        (@subs_base_search_locations,
+        rec_subdirs_of(@subs_base_search_locations));
+}
+
+# Subroutine: tumplate_search_locations()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Create recursive list of all directories inside the base
+#   template file lookup directories.
+# Returns: 
+#   Described in 'Purpose'.
+sub template_search_locations {
+    return (@template_base_search_locations, 
+        rec_subdirs_of(@template_base_search_locations));
+}
+
+# Subroutine: output_filehandle($filename)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Open a file handle for writing, based on a filename.
+#   Using STDIN if given $filename is '-'.
+# Returns: 
+#   A writable handle to file name $filename
+sub output_filehandle {
+    my ($filename) = @_;
+
+    # Output to stdout if the filename is '-'.
+    return \*STDOUT if $filename eq '-';
+
+    # Try to open the file.
+    open my $fh, '>', $filename
+        or croak("Couldn't open destination file $filename");
+
+    # Return the newly opened file handle.
+    return $fh;
+}
+
+# Subroutine: parse_sub_line()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Parse a single line of a substitution file.
+# Returns: 
+#   Pair ($pattern,$substitution) if a substitution was on the given
+#   line.
+#   Undef if the line is a comment.
+#   Otherwise, subroutine croaks with an error message.
+sub parse_sub_line{
+    my ($sub_line) = @_;
+    
+    # Remove any trailing newline.
+    chomp $sub_line;
+
+    # Remove any leading whitespace.
+    $sub_line =~ s/\A \s+//xms;
+
+    # Return the substitution if sub_line defines one.
+    return ($1,$2) if ($sub_line =~ m/\A (\w+) = (.*) \z/xms);
+
+    # Return undef / empty list for empty lines and comments
+    return if $sub_line =~ m/\A (?: [#] | \z ) /xms;
+
+    # Error if we haven't returned yet
+    croak("expected substitution line: $sub_line");
+}
+
+# Subroutine: parse_subs_file()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Parse a whole substitution file via repeated calls to
+#   parse_sub_line().
+# Returns: 
+#   A substitution table (hash) keyed by patterns and with corresponding
+#   substitutions as values.
+sub parse_subs_file {
+    my ($subs_filename) = @_;
+
+    # Try to open the subs file.
+    open(my $subs_file, "<$subs_filename") ||
+        croak("can't open .subs file $subs_filename.");
+
+    # Initialize the file's substitution table
+    my %sub_table;
+
+    # Read in the subs file
+    SCANSUBSFILE:
+    for my $sub_line (<$subs_file>) {
+
+        # Parse the line.
+        my ($sub_text, $replacement) = parse_sub_line($sub_line);
+
+        # Continue when parse_sub_line didn't find a substitution.
+        next SCANSUBSFILE if (!defined $sub_text);
+
+        # Fill in the substitution table.
+        $sub_table{$sub_text} = $replacement;
+    }
+
+    # Close the subs file.
+    close($subs_file);
+
+    # Return the filled substitution table.
+    return %sub_table;
+}
+
+# Subroutine: parse_subs_files()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Parse a list of given substitution file names.
+# Returns: 
+#   A unified substitution table.
+#   Conflicts/Collisions will replace the current substitutions with the
+#   new one colliding with it.
+sub parse_subs_files {
+    my @subs_files = @_;
+
+    # A cummulative substition table.
+    my %cumm_sub_table;
+
+    # Process each subs file.
+    for my $subs_file (@subs_files) {
+        # Get the substitution table from the file
+        my %file_sub_table = parse_subs_file($subs_file);
+
+        # Add the file's sub table to the cummulative one.
+        for my $sub_name (keys %file_sub_table) {
+            # Overwrite any older entry in the cummulative table.
+            $cumm_sub_table{$sub_name} = $file_sub_table{$sub_name};
+        }
+    }
+
+    # Return the finished substitution table.
+    return %cumm_sub_table;
+}
+
+# Subroutine: default_subs()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Create a hash of default substitutions.
+# Returns: Hash
+sub default_subs {
+    # Substitutions which are always defined.
+    my %sub_default_constants = (
+        'D' => strftime("%D %T", localtime()),  # Current Date
+        '$' => '$',                             # '$$' produces '$'
+        'F' => $ARGV{'--output'},               # output file
+    );
+
+    # Copy to a hash containing entries which are not always defined.
+    my %sub_defaults = %sub_default_constants;
+
+    return %sub_defaults;
+}
+
+# Subroutine: substituted($str, $subs_ref)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Perform substitutions in a non-modifying way.
+# Returns: 
+#   Return a copy of string $str that has had patterns substituted from 
+#   the table pointed to by $subs_ref.
+sub substituted {
+    my ($str,$sub_table_ref) = @_;
+
+    # Perform a global substitution of macro patterns
+    $str 
+        =~  s/ 
+                \$ ( \w | [{] \w+ [}] | \$ ) 
+            / 
+                my $x = $1; $x =~ s{[{}]}{}g; $sub_table_ref->{$x} || "";
+            /egxms;
+
+    return $str;
+}
+
+# Subroutine: find_and_open_template($template_name)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Find a template file name $template_name in known locations and
+#   return an open file handle reading from the template.
+# Returns: 
+#   Template filehandle Reference open for reading.
+sub find_and_open_template {
+    my ($tmpl_name) = @_;
+
+    my $filename;
+
+    my @search_locations = template_search_locations();
+
+    # look in the possible locations
+    SEARCHDIRS:
+    for my $search_dir (@search_locations) {
+        
+        # Construct a possible path of the template.
+        $filename = "$search_dir/$tmpl_name.$template_ext";
+
+        # Break the look if the file is found.
+        last SEARCHDIRS if -r $filename;
+
+        # Reset the filename.
+        $filename = undef;
+    }
+
+    # Ensure that the template was found.
+    croak(
+        "Couldn't find template $tmpl_name.$template_ext in "
+            . join(':',@search_locations)
+    ) if !defined $filename;
+
+    # Attempt to open the template.
+    open my $template_fh, '<', $filename
+        or croak("Couldn't open template $filename");
+
+    # Return the file handle.
+    return $template_fh;
+}
+
+# Subroutine: find_subs_files()
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Gather all substitution files to read into the substitution table.
+# Returns: List
+#   All locatable substition filenames.
+sub find_subs_files {
+    # Find .qtsubs files in standard search locations
+    my @subs_files = map {glob "$_/*.qtsubs"} subs_search_locations();
+
+    # Add any command-line specified files second to give high priority.
+    push @subs_files, @{$opt{'--file'}} if defined $opt{'--file'};
+
+    # Return the list of subs files.
+    return @subs_files;
+}
+
+# Subroutine: subbed_template_line($template_fh, $subs_ref)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Read a line from $template_fh,
+#   and perfom substitutions from $subs_ref.
+# Returns: String
+#   Substituted template line.
+sub subbed_template_line {
+    my ($template_fh, $subs_ref) = @_;
+
+    # Read the next line from the template file handle.
+    my $line = <$template_fh>;
+
+    # Return if EOF was reached.
+    return if !defined $line;
+
+    # Make a substituted copy of the line.
+    my $subbed_line = substituted($line, $subs_ref);
+
+    # Return substituted line.
+    return $subbed_line;
+}
+
+# Subroutine: print_subbed_template($template_fh, $subs_ref, $output_fh)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   Read the template in from $template_fh, 
+#   perform substitutions from table pointed to by $subs_ref,
+#   and write to $output_fh.
+# Returns: undef
+sub print_subbed_template {
+    my ($template_fh, $subs_ref, $output_fh) = @_;
+
+    # Get the next substituted line.
+    while (my $subbed = subbed_template_line($template_fh, $subs_ref)) {
+        # Return when the separator "!!\n" is found.
+        return if $subbed eq "!!\n";
+
+        # Print the substituted line to the output file handle.
+        print {$output_fh} $subbed;
+    }
+    return;
+}
+
+# Subroutine: execute_template_script($template_handle, $subs_ref)
+# Type: INTERNAL UTILITY
+# Purpose: 
+#   After template has been written to a file, execute the script
+#   included in the remaining partition of the file handle 
+#   $template_handle.
+#   The script has substitutions done on it in the same way as the rest
+#   of the template.
+# Returns: undef
+sub execute_template_script {
+    my ($template_fh, $subs_ref) = @_;
+
+    # Get the next substituted script line.
+    SCRIPTEXEC:
+    while (my $script = subbed_template_line($template_fh, $subs_ref)) {
+        next SCRIPTEXEC if $script =~ m/\A \s* \n? \z/xms;
+
+        # Execute the script line.
+        system $script;
+
+        if ($CHILD_ERROR) {
+            croak("Error executing line: $script\n");
+        }
+    }
+
+    return;
+}
+
+# Finally, kickstart the script
+main();
+
+__END__
+
+=head1 NAME
+
+qtemp - quick template generator
+
+=head1 VERSION
+
+This documentation refers to qtemp version 0.5
+Originally created on 02/06/10 23:44:17
+
+=head1 USAGE
+
+qtemp [options] <template_name>
+
+=head1 REQUIRED ARGUMENTS
+
+=over
+
+=item <template_name>
+
+Name of template to use (i.e. 'perl' uses template 'perl.qtemp').
+
+=back
+
+=head1 OPTIONS
+
+=over
+
+=item -f <sub_file> | --file [=] <sub_file>
+
+Specify a file with custom substitutions to use.
+
+=for Euclid:
+    repeatable
+    sub_file.type:  readable
+
+=item -o <output_file> | --output [=] <output_file>
+
+Name of file to print template to (default: '-').
+Defines substitution $F mapping to <output_file> if not equal to '-'.
+
+=for Euclid:
+    output_file.type:       writable
+    output_file.default: '-'
+
+=item -s <pattern>=<sub> | --add-substitution <pattern>=<sub>
+
+Define a substitution to use in the template.
+
+=for Euclid:
+    repeatable
+    pattern.type: /\w+/
+    sub.default: ""
+
+=item --version
+
+=item --usage
+
+=item --help
+
+=item --man
+
+Print the usual program information
+
+=back
+
+=head1 DESCRIPTION
+
+qtemp is a template managing program. It is currently used generally to
+quickly create new scripts (perl, python, ...).
+
+qtemp prints templates either to STDOUT or to a file.
+
+Templates can have substitution variables in them, which allow custom 
+information (e.g. filename, creation date, etc.) to be inserted into the 
+template at the time of generation.
+
+When templates are written to a file, the template can also specify
+commands to execute after writing. This could include running chmod on
+script files, or perhaps adding and making an initial commit in a version
+control system.
+
+=head1 TEMPLATES
+
+Templates can be added to a searched template directory.
+
+Templates treat patterns of the form /$./ as macro substitutions and will
+be replaced when the template is printed.
+
+A single line with only two exclaimation marks denotes the end of the
+template. The remaining lines of the template file are treated as a shell
+script and executed when the template is written to a file.
+
+=head1 SUBSTITUTIONS
+
+String substitutions to be made in templates can be defined in .subs files
+and placed in a searched subs directory.
+
+Substitutions are defined one-per-line in a .subs file.
+
+A substitution definition consists of a single character X (the
+substitution name) followed directly by an equal sign. The remaining 
+characters on the line of a substitution definition (minus the newline 
+character) are used as the substition string for the pattern $X.
+
+The pattern '$$' in template files is special and is substituted for a
+single '$' always. A substitution for '$' can not be defined and will
+cause the program to crash.
+
+=head1 AUTHOR
+
+Bryan Matsuo (bryan.matsuo@gmail.com)
+
+=head1 BUGS
+
+=head1 COPYRIGHT
+

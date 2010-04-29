@@ -1,0 +1,6 @@
+Revision history for Perl extension QuickTemplate.
+
+0.05  Tue Apr 27 01:25:07 2010
+	- original version; created by h2xs 1.23 with options
+		-X -n QuickTemplate
+

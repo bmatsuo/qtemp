@@ -1,0 +1,12 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/QuickTemplate.t
+t/QuickTemplate-Parser.t
+t/QuickTemplate-Generator.t
+lib/File/QuickTemplate.pm
+lib/File/QuickTemplate/Parser.pm
+lib/File/QuickTemplate/Generator.pm
+lib/File/QuickTemplate/SubstitutionTable.pm
+scripts/qtemp
