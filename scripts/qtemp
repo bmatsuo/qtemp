@@ -509,7 +509,7 @@ qtemp - quick template generator
 
 =head1 VERSION
 
-This documentation refers to qtemp version 0.5
+This documentation refers to qtemp version 0.05
 Originally created on 02/06/10 23:44:17
 
 =head1 USAGE
@@ -617,5 +617,10 @@ Bryan Matsuo (bryan.matsuo@gmail.com)
 
 =head1 BUGS
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT & LISCENCE
 
+Copyright (C) 2010 by Bryan Matsuo
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.10.0 or,
+at your option, any later version of Perl 5 you may have available.
