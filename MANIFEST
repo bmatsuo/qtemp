@@ -6,8 +6,8 @@ INSTALL
 t/QuickTemplate.t
 t/QuickTemplate-Parser.t
 t/QuickTemplate-Generator.t
-lib/File/QuickTemplate.pm
-lib/File/QuickTemplate/Parser.pm
-lib/File/QuickTemplate/Generator.pm
-lib/File/QuickTemplate/SubstitutionTable.pm
+lib/App/Qtemp/QuickTemplate.pm
+lib/App/Qtemp/QuickTemplate/Parser.pm
+lib/App/Qtemp/QuickTemplate/Generator.pm
+lib/App/Qtemp/QuickTemplate/SubstitutionTable.pm
 scripts/qtemp
