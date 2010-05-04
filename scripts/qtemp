@@ -4,6 +4,8 @@
 
 our $VERSION = 0.05;
 
+# TODO: Allow specification of date format.
+
 # TODO: When substitution lookup otherwise fails, attempt to lookup in
 # %ENV. This could be extremely useful.
 
@@ -571,7 +573,9 @@ Print the usual program information
 =head1 DESCRIPTION
 
 qtemp is a template managing program. It is currently used generally to
-quickly create new scripts (perl, python, ...).
+quickly create new scripts (perl, python, ...). It can also be used in
+conjunction with vim to insert templates for new functions/subroutines
+into a file being editted.
 
 qtemp prints templates either to STDOUT or to a file.
 
@@ -586,14 +590,16 @@ control system.
 
 =head1 TEMPLATES
 
-Templates can be added to a searched template directory.
+Templates can be added by placing them in any (possibly nested)
+subdirectory of a searched template directory.
 
-Templates treat patterns of the form /$./ as macro substitutions and will
-be replaced when the template is printed.
+Templates treat patterns of the form /\$\w/ or /\$\{\w+\}/ as macro 
+substitutions and will be replaced when the template is printed.
 
 A single line with only two exclaimation marks denotes the end of the
 template. The remaining lines of the template file are treated as a shell
-script and executed when the template is written to a file.
+script and executed when the template is written to a file. Pattern
+substitution can be performed in the script as well.
 
 =head1 SUBSTITUTIONS
 
@@ -602,18 +608,63 @@ and placed in a searched subs directory.
 
 Substitutions are defined one-per-line in a .subs file.
 
-A substitution definition consists of a single character X (the
+A substitution definition consists of a single word X (the
 substitution name) followed directly by an equal sign. The remaining 
 characters on the line of a substitution definition (minus the newline 
-character) are used as the substition string for the pattern $X.
+character) are used as the substition string for the pattern $X (or ${X}
+if X is more than one character).
 
-The pattern '$$' in template files is special and is substituted for a
-single '$' always. A substitution for '$' can not be defined and will
-cause the program to crash.
+=head1 SPECIAL SUBSTITUTIONS
+
+There are a number of special substitutions that are defined by default
+when qtemp starts execution.
+
+=over
+
+=item$$
+
+This patern expands to a single dollar sign '$'. This is useful when you
+actually want a dollar sign in the template.
+
+=item$F
+
+When writing the template to a file with the -o option, this pattern
+expands to the name of the file being written to.
+
+=item$D
+
+This pattern will expand to the date in a short form. 
+
+For example: 02/06/10 23:44:17
+
+=back
+
+=head1 EXAMPLES
+
+An example template for a perl program follows:
+
+    #!/usr/bin/perl
+    # Filename: $F
+    # Author: ${AUTHOR}
+    # Created: $D
+
+    sub main {
+
+    }
+
+    exit(main())
+    !!
+    chmod +x $F
+
+An example substitution file might look like the following:
+
+    NAME=Bryan Matsuo
+    EMAIL=bryan.matsuo@gmail.com
+    AUTHOR=${NAME} <${EMAIL}>
 
 =head1 AUTHOR
 
-Bryan Matsuo (bryan.matsuo@gmail.com)
+Bryan Matsuo <bryan.matsuo@gmail.com>
 
 =head1 BUGS
 
