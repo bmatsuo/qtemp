@@ -2,7 +2,7 @@ NAME
        qtemp - quick template generator
 
 VERSION
-       This documentation refers to qtemp version 0.05 Originally created on
+       This documentation refers to qtemp version 0.06 Originally created on
        02/06/10 23:44:17
 
 USAGE
@@ -23,6 +23,9 @@ OPTIONS
        -s <pattern>=<sub> | --add-substitution <pattern>=<sub>
            Define a substitution to use in the template.
 
+       -d <date-format> | --date-format [=] <date-format>
+           Specify the date format to use in the special $D date substitution.
+
        --version
        --usage
        --help
@@ -31,7 +34,9 @@ OPTIONS
 
 DESCRIPTION
        qtemp is a template managing program. It is currently used generally to
-       quickly create new scripts (perl, python, ...).
+       quickly create new scripts (perl, python, ...). It can also be used in
+       conjunction with vim to insert templates for new functions/subroutines
+       into a file being editted.
 
        qtemp prints templates either to STDOUT or to a file.
 
@@ -45,14 +50,24 @@ DESCRIPTION
        version control system.
 
 TEMPLATES
-       Templates can be added to a searched template directory.
+       Templates can be added by placing them in any (possibly nested)
+       subdirectory of a searched template directory.
 
-       Templates treat patterns of the form /$./ as macro substitutions and
-       will be replaced when the template is printed.
+       Templates can contain macro substitutions. A macro substitution is
+       denoted by a dollar sign ('$') in a template, followed by curly braces
+       ('{','}') enclosing the macro name. A macro name must start with either
+       an aphabetic character ('a-z' or 'A-Z') or underscore ('_').  The rest
+       of the characters can be either alphanumeric or underscores.  The curly
+       braces can be omitted from a macro substitution if the macro name only
+       consists of one character (not a recommended practice). Macro
+       substitutions are defined in substitution or '.subs' files.
+       Environment variables can also be used as in macro substitutions if a
+       macro with the same name was not previously defined.
 
        A single line with only two exclaimation marks denotes the end of the
        template. The remaining lines of the template file are treated as a
        shell script and executed when the template is written to a file.
+       Pattern substitution can be performed in the script as well.
 
 SUBSTITUTIONS
        String substitutions to be made in templates can be defined in .subs
@@ -60,17 +75,50 @@ SUBSTITUTIONS
 
        Substitutions are defined one-per-line in a .subs file.
 
-       A substitution definition consists of a single character X (the
-       substitution name) followed directly by an equal sign. The remaining
-       characters on the line of a substitution definition (minus the newline
-       character) are used as the substition string for the pattern $X.
+       A substitution definition consists of a single word X (the substitution
+       name) followed directly by an equal sign. The remaining characters on
+       the line of a substitution definition (minus the newline character) are
+       used as the substition string for the pattern $X (or ${X} if X is more
+       than one character).
 
-       The pattern '$$' in template files is special and is substituted for a
-       single '$' always. A substitution for '$' can not be defined and will
-       cause the program to crash.
+SPECIAL SUBSTITUTIONS
+       There are a number of special substitutions that are defined by default
+       when qtemp starts execution.
+
+        $$ This patern expands to a single dollar sign '$'. This is useful
+           when you actually want a dollar sign in the template.
+
+        $F When writing the template to a file with the -o option, this
+           pattern expands to the name of the file being written to.
+
+        $D This pattern will expand to the date in a short form.
+
+           For example: 02/06/10 23:44:17
+
+EXAMPLES
+       An example template for a perl program follows:
+
+           #!/usr/bin/perl
+           # Filename: $F
+           # Author: ${AUTHOR}
+           # Created: $D
+
+           sub main {
+
+           }
+
+           exit(main())
+           !!
+           chmod +x $F
+
+       An example substitution file might look like the following:
+
+           NAME=Bryan Matsuo
+           EMAIL=bryan.matsuo@gmail.com
+           AUTHOR=${NAME} <${EMAIL}>
 
 AUTHOR
-       Bryan Matsuo (bryan.matsuo@gmail.com)
+       Bryan Matsuo <bryan.matsuo@gmail.com>
 
 BUGS
 COPYRIGHT & LISCENCE
@@ -79,3 +127,7 @@ COPYRIGHT & LISCENCE
        This library is free software; you can redistribute it and/or modify it
        under the same terms as Perl itself, either Perl version 5.10.0 or, at
        your option, any later version of Perl 5 you may have available.
+
+
+
+perl v5.10.0                      2010-06-17                          QTEMP(1)
