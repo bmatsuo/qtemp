@@ -2,12 +2,7 @@
 
 # Use perldoc or option --man to read documentation
 
-our $VERSION = 0.05;
-
-# TODO: Allow specification of date format.
-
-# TODO: When substitution lookup otherwise fails, attempt to lookup in
-# %ENV. This could be extremely useful.
+our $VERSION = 0.06;
 
 # TODO: add documentation to the .qtemp template format
 #   Then add options to view documentation and search the template
@@ -139,7 +134,7 @@ sub mk_substitution_table {
     # Create substitution table.
     my %sub 
         =   ( 
-            default_subs(), 
+            default_subs($opt{'--date-format'}), 
             parse_subs_files(@sub_files),
             %cmd_line_subs,
             );
@@ -329,17 +324,21 @@ sub parse_subs_files {
     return %cumm_sub_table;
 }
 
-# Subroutine: default_subs()
+# Subroutine: default_subs(), default_subs($date_format)
 # Type: INTERNAL UTILITY
 # Purpose: 
 #   Create a hash of default substitutions.
+#   If date format is supplied, it will be passed to strftime instead of
+#   the default format.
 # Returns: Hash
 sub default_subs {
+    my $date_format = shift || '%D %T';
+
     # Substitutions which are always defined.
     my %sub_default_constants = (
-        'D' => strftime("%D %T", localtime()),  # Current Date
-        '$' => '$',                             # '$$' produces '$'
-        'F' => $ARGV{'--output'},               # output file
+        'D' => strftime($date_format, localtime()), # Current Date
+        '$' => '$',                                 # '$$' produces '$'
+        'F' => $ARGV{'--output'},                   # output file
     );
 
     # Copy to a hash containing entries which are not always defined.
@@ -521,7 +520,7 @@ qtemp - quick template generator
 
 =head1 VERSION
 
-This documentation refers to qtemp version 0.05
+This documentation refers to qtemp version 0.06
 Originally created on 02/06/10 23:44:17
 
 =head1 USAGE
@@ -568,6 +567,13 @@ Define a substitution to use in the template.
     pattern.type: /\w+/
     sub.default: ""
 
+=item -d <date-format> | --date-format [=] <date-format>
+
+Specify the date format to use in the special $D date substitution.
+
+=for Euclid:
+    date-format.default: '%D %T'
+
 =item --version
 
 =item --usage
@@ -603,8 +609,16 @@ control system.
 Templates can be added by placing them in any (possibly nested)
 subdirectory of a searched template directory.
 
-Templates treat patterns of the form /\$\w/ or /\$\{\w+\}/ as macro 
-substitutions and will be replaced when the template is printed.
+Templates can contain macro substitutions. A macro substitution is denoted
+by a dollar sign ('$') in a template, followed by curly braces ('{','}')
+enclosing the macro name. A macro name must start with either an aphabetic
+character ('a-z' or 'A-Z') or underscore ('_').  The rest of the 
+characters can be either alphanumeric or underscores.  The curly braces 
+can be omitted from a macro substitution if the macro name only consists 
+of one character (not a recommended practice). Macro substitutions are 
+defined in substitution or '.subs' files.  Environment variables can 
+also be used as in macro substitutions if a macro with the same name 
+was not previously defined.
 
 A single line with only two exclaimation marks denotes the end of the
 template. The remaining lines of the template file are treated as a shell
@@ -631,17 +645,20 @@ when qtemp starts execution.
 
 =over
 
-=item$$
+=item
+$$
 
 This patern expands to a single dollar sign '$'. This is useful when you
 actually want a dollar sign in the template.
 
-=item$F
+=item
+$F
 
 When writing the template to a file with the -o option, this pattern
 expands to the name of the file being written to.
 
-=item$D
+=item
+$D
 
 This pattern will expand to the date in a short form. 
 
