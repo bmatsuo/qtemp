@@ -371,7 +371,9 @@ sub substituted {
             / 
                 my $x = $1; 
                 $x =~ s{[{}]}{}g; 
-                $sub_table_ref->{$x} || "";
+                $sub_table_ref->{$x} 
+                    || $ENV{$x}
+                    || "";
             /egxms;
 
     return $str;
