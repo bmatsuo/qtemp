@@ -358,12 +358,20 @@ sub default_subs {
 sub substituted {
     my ($str,$sub_table_ref) = @_;
 
+    my $sub_char = qr{(?: [a-zA-Z_])}xms;
+
     # Perform a global substitution of macro patterns
     $str 
         =~  s/ 
-                \$ ( \w | [{] \w+ [}] | \$ ) 
+                \$ 
+                ( 
+                    $sub_char
+                    | [{] (?: $sub_char (?: $sub_char | \d ) ) [}] 
+                    | \$ ) 
             / 
-                my $x = $1; $x =~ s{[{}]}{}g; $sub_table_ref->{$x} || "";
+                my $x = $1; 
+                $x =~ s{[{}]}{}g; 
+                $sub_table_ref->{$x} || "";
             /egxms;
 
     return $str;
