@@ -3,11 +3,8 @@ Makefile.PL
 MANIFEST
 README
 INSTALL
-t/QuickTemplate.t
-t/QuickTemplate-Parser.t
-t/QuickTemplate-Generator.t
-lib/App/Qtemp/QuickTemplate.pm
-lib/App/Qtemp/QuickTemplate/Parser.pm
-lib/App/Qtemp/QuickTemplate/Generator.pm
-lib/App/Qtemp/QuickTemplate/SubstitutionTable.pm
+t/Qtemp-SubsTable.pm
+t/Qtemp-Template.t
+lib/App/Qtemp/Template.pm
+lib/App/Qtemp/SubsTable.pm
 scripts/qtemp
