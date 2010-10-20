@@ -8,11 +8,6 @@ our $VERSION = 0.06;
 #   Then add options to view documentation and search the template
 #   library.
 
-# TODO: classify objects in this program.
-#   - QTemp::SubstitutionTable
-#   - QTemp::Template
-#   - QTemp::Template::Parser
-
 # Include some core modules.
 use strict;
 use warnings;
@@ -28,8 +23,8 @@ use Getopt::Euclid qw{ :vars<opt_> };
 # I should probably remove Readonly.
 use Readonly; 
 
-use App::Qtemp::QuickTemplate::Parser;
-use App::Qtemp::QuickTemplate::Generator;
+use App::Qtemp::SubsTable;
+use App::Qtemp::Template;
 
 # Fetch some basic program information
 Readonly my $prog_incantation  => $0;
@@ -87,26 +82,12 @@ Readonly my @subs_base_search_locations
 #   Does not return. Exit is called after all other commands.
 sub main {
     # Make the substitution table.
-    my %sub = mk_substitution_table();
+    my $sub_table = mk_substitution_table();
 
     # Find the template.
-    my $tmpl_fh = find_and_open_template($opt_template_name);
+    my $template = find_and_open_template($opt_template_name);
   
-    # Open the output filehandle.
-    my $dest_fh = output_filehandle($opt_output);
-    
-    # Print the template w/ substitution.
-    print_subbed_template($tmpl_fh, \%sub, $dest_fh);
-
-    # Close the output filehandle.
-    close $dest_fh;
-
-    # Perform extra script actions if output is not standard output.
-    execute_template_script($tmpl_fh, \%sub, $dest_fh) 
-        if !($opt_output eq '-');
-
-    # Close the template filehandle.
-    close $tmpl_fh;
+    $template->write_subbed(($opt_output eq '-' ? () : ($opt_output)));
 
     exit($exitcode);
 }
@@ -122,25 +103,22 @@ sub main {
 #   substitutions in that order (last loaded is highest priority).
 # Returns: A new hash containing all substitutions
 sub mk_substitution_table {
-    # Find all substition definition files.
+    # Create a default substitution table.
+    my %def_subs = default_subs($opt{'--date-format'});
+    my $st = App::Qtemp::SubsTable->new(substitutions => \%def_subs);
+
+    # Add substitutions from .subs files in ~/.qtemp/subs
     my @sub_files = find_subs_files();
+    for my $sub_file (@sub_files) {
+        my $file_st = subtable_from($sub_file);
+        $st = $st->union($file_st);
+    }
 
-    # Handle command-line specified substitutions.
+    # Add command-line specified substitutions.
     my @opt_subs = @{$opt{'--add-substitution'} || []};
+    for my $opt_sub (@opt_subs) { $st->add($opt_sub); }
 
-    # Turn each option's hash ref into a one element hash; pattern=>sub.
-    my %cmd_line_subs = map { ($_->{'pattern'}, $_->{'sub'}) } @opt_subs;
-
-    # Create substitution table.
-    my %sub 
-        =   ( 
-            default_subs($opt{'--date-format'}), 
-            parse_subs_files(@sub_files),
-            %cmd_line_subs,
-            );
-
-    # Return substitution table
-    return %sub;
+    return $st;
 }
 
 # Subroutine: subdirectories_of($dir,$recursive)
@@ -336,9 +314,7 @@ sub default_subs {
 
     # Substitutions which are always defined.
     my %sub_default_constants = (
-        'D' => strftime($date_format, localtime()), # Current Date
-        '$' => '$',                                 # '$$' produces '$'
-        'F' => $ARGV{'--output'},                   # output file
+        'DATE' => strftime($date_format, localtime()), # Current Date
     );
 
     # Copy to a hash containing entries which are not always defined.
@@ -412,12 +388,9 @@ sub find_and_open_template {
             . join(':',@search_locations)
     ) if !defined $filename;
 
-    # Attempt to open the template.
-    open my $template_fh, '<', $filename
-        or croak("Couldn't open template $filename");
-
-    # Return the file handle.
-    return $template_fh;
+    # Read and return the template.
+    my $template = read_template_file($filename);
+    return $template;
 }
 
 # Subroutine: find_subs_files()

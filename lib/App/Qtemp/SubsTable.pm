@@ -5,6 +5,12 @@ package App::Qtemp::SubsTable;
 use strict;
 use warnings;
 use Carp;
+require Exporter;
+use AutoLoader qw(AUTOLOAD);
+our @ISA;
+push @ISA, 'Exporter';
+
+our @EXPORT = qw{subtable_from};
 
 use Exception::Class (
     'ValueError',
