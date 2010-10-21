@@ -6,11 +6,13 @@ use strict;
 use warnings;
 use Carp;
 use File::Glob qw{bsd_glob};
+
+our $VERSION = "0.0_3";
+
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
 our @ISA;
 push @ISA, 'Exporter';
-
 our @EXPORT = qw{
     glob_safe 
     find_pattern

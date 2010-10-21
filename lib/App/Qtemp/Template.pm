@@ -18,7 +18,7 @@ use Exception::Class (
     'TemplateScriptError',
 );
 
-our $VERSION = '0.0_1';
+our $VERSION = '0.0_3';
 our @EXPORT = qw{read_template_file parse_template_string};
 use Moose;
 

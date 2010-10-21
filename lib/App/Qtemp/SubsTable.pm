@@ -25,7 +25,7 @@ use Exception::Class (
 
 use App::Qtemp::QuickTemplate;
 
-our $VERSION = '0.0_2';
+our $VERSION = '0.0_3';
 
 use Moose;
 
