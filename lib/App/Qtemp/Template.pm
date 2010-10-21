@@ -76,6 +76,9 @@ sub parse_template_string {
 
         $templ{local_subs} = $sub_table;
     }
+    else {
+        $templ{local_subs} = App::Qtemp::SubsTable->new();
+    }
 
     # Handle the template section.
     my $template_section = shift @sections;
@@ -86,6 +89,9 @@ sub parse_template_string {
     if ($num_sections > 1) {
         my $script_templ_section= shift @sections;
         $templ{script} = $script_templ_section;
+    }
+    else {
+        $templ{script} = q{};
     }
 
     return App::Qtemp::Template->new(%templ);
@@ -104,8 +110,8 @@ sub subbed_template {
 
     my $subs_table = shift;
     my $total_subs 
-        = defined $subs_table ? $self->union($subs_table) 
-        : $self->substitutions;
+        = defined $subs_table ? $self->local_subs->union($subs_table)
+        : $self->local_subs;
     $total_subs->compile;
 
     return $total_subs->perform_subs($self->templ_str);
@@ -149,7 +155,7 @@ sub write_subbed {
                 error => "Can't open $filename for writing.");
 
         # Add a filename substitution into the SubsTable.
-        $subs_table = $subs_table->add("FILE", $filename);
+        $subs_table->add("FILE", $filename);
     }
 
     print {$file} $self->subbed_template($subs_table);

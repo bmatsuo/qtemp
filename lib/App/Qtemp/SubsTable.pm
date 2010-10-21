@@ -139,7 +139,7 @@ sub union {
     my ($self, $other) = @_;
 
     CompiledTableError->throw(error => "Can't union a compiled table")
-        if ($self->is_compiled || $other->is_compiled);
+        if $self->is_compiled || $other->is_compiled;
 
     my %s1 = %{$self->substitutions};
 
@@ -308,8 +308,9 @@ sub subtable_from {
     my @lines = <$fh>;
     my @joined;
     my $prepend;
-    for my $i (0 .. @lines) {
+    for my $i (0 .. scalar @lines) {
         my $sub_line = $lines[$i];
+        next if !defined $sub_line || $sub_line =~ /\A \s* \z/xms;
         $sub_line = $prepend . $sub_line if defined $prepend;
         $prepend = undef;
         if ($sub_line =~ s/\\ \n \z/\n/xms) {
