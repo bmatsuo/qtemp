@@ -38,7 +38,8 @@ sub read_template_file {
 
     # Slurp the file.
     open my $fh, '<', $file
-        or TemplateOpenError->throw(error => "Can't open template $file.");
+        or TemplateOpenError->throw(
+            error => "Can't open template $file.\n");
     my $qtemp_cont = do {local $/; <$fh> };
     close $fh;
 
@@ -57,7 +58,7 @@ sub parse_template_string {
     my $num_sections = scalar @sections;
     if (@sections > 3) {
         TemplateFormatError->throw(
-            error => "Found $num_sections sections; expects no more than 3.");
+            error => "Found $num_sections sections; expects no more than 3.\n");
     }
 
     my %templ = (
@@ -69,14 +70,31 @@ sub parse_template_string {
     if ($num_sections == 3) {
         my $subs_section = shift @sections;
         my @sub_defs = split "\n", $subs_section;
-        # Create a substitution hash.
-        my %sub = eval {(map {(split '=', $_, 2)} @sub_defs)};
-        if ($@ =~ /./xms) {
-            TemplateFormatError->throw(
-                error => "Malformed substitution definition (missing '='?);");
-        }
-        my $sub_table = App::Qtemp::SubsTable->new(substitutions => \%sub);
 
+        # Create a substitution hash.
+        my %sub;
+        my $prepend;
+        for my $sub_line (@sub_defs) {
+            if (defined $prepend) { $sub_line = $prepend.$sub_line; }
+
+            if ($sub_line =~ m/ \\ \z/xms) {
+                $prepend = "$sub_line\n";
+                next;
+            }
+            else {
+                $prepend = undef;
+                my ($patt, $sub) = split "=", $sub_line, 2;
+                if (!defined $sub) {
+                    TemplateFormatError->throw(
+                        error => "Malformed substitution $sub_line"
+                            . "(perhaps missing '='?).\n");
+                }
+                $sub{$patt} = $sub
+            }
+        }
+
+        # Create a SubsTable with local substitutions.
+        my $sub_table = App::Qtemp::SubsTable->new(substitutions => \%sub);
         $templ{local_subs} = $sub_table;
     }
 
@@ -150,7 +168,7 @@ sub write_subbed {
     if ($output_is_file) {
         # Open the destination file for writing.
         open $file, ">", $filename or TemplateOpenError->throw(
-                error => "Can't open $filename for writing.");
+                error => "Can't open $filename for writing.\n");
 
         # Add a filename substitution into the SubsTable.
         $subs_table->add("FILE", $filename);
@@ -163,7 +181,7 @@ sub write_subbed {
         my $script = $self->subbed_script($subs_table);
         if (!defined $script && defined $self->script) {
             TemplateScriptError->throw(
-                error => "Substitution on script returned undefined value.");
+                error => "Substitution on script returned undefined value.\n");
         }
         my @cmds = split "\n", $script;
         @cmds = grep { $_ !~ m/\A \s* \z/xms } @cmds;
@@ -171,7 +189,7 @@ sub write_subbed {
             print "$cmd\n";
             if (system($cmd) != 0) {
                 TemplateScriptError->throw(
-                    error => "Error running template script; $?");
+                    error => "Error running template script; $?\n");
             }
         }
     }
