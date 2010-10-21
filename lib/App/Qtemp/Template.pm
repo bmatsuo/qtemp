@@ -57,10 +57,13 @@ sub parse_template_string {
     my $num_sections = scalar @sections;
     if (@sections > 3) {
         TemplateFormatError->throw(
-            error => "Found $num_sections sections; expects no mor than 3.");
+            error => "Found $num_sections sections; expects no more than 3.");
     }
 
-    my %templ;
+    my %templ = (
+        local_subs => App::Qtemp::SubsTable->new(),
+        templ_str => q{},
+        script => q{},);
 
     # Handle the local substitution definitions if there are any.
     if ($num_sections == 3) {
@@ -76,9 +79,6 @@ sub parse_template_string {
 
         $templ{local_subs} = $sub_table;
     }
-    else {
-        $templ{local_subs} = App::Qtemp::SubsTable->new();
-    }
 
     # Handle the template section.
     my $template_section = shift @sections;
@@ -89,9 +89,6 @@ sub parse_template_string {
     if ($num_sections > 1) {
         my $script_templ_section= shift @sections;
         $templ{script} = $script_templ_section;
-    }
-    else {
-        $templ{script} = q{};
     }
 
     return App::Qtemp::Template->new(%templ);
@@ -149,7 +146,8 @@ sub write_subbed {
     my ($self, $subs_table, $filename) = @_;
 
     my $file = \*STDOUT;
-    if (defined $filename) {
+    my $output_is_file = defined $filename;
+    if ($output_is_file) {
         # Open the destination file for writing.
         open $file, ">", $filename or TemplateOpenError->throw(
                 error => "Can't open $filename for writing.");
@@ -161,12 +159,24 @@ sub write_subbed {
     print {$file} $self->subbed_template($subs_table);
 
     # Attempt to execute the template's script if writing to a file.
-    if ($file != \*STDOUT) {
+    if ($output_is_file) {
         my $script = $self->subbed_script($subs_table);
-        if (system($script) != 0) {
+        if (!defined $script && defined $self->script) {
             TemplateScriptError->throw(
-                error => "Error running template script; $?");
+                error => "Substitution on script returned undefined value.");
         }
+        my @cmds = split "\n", $script;
+        @cmds = grep { $_ !~ m/\A \s* \z/xms } @cmds;
+        for my $cmd (@cmds) {
+            print "$cmd\n";
+            if (system($cmd) != 0) {
+                TemplateScriptError->throw(
+                    error => "Error running template script; $?");
+            }
+        }
+    }
+    else {
+        # print {\*STDERR} "Not performing script...\n";
     }
 
     return;
