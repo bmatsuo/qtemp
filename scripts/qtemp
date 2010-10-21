@@ -111,7 +111,8 @@ sub mk_substitution_table {
 
     # Add command-line specified substitutions.
     my @opt_subs = @{$opt{'--add-substitution'} || []};
-    for my $opt_sub (@opt_subs) { $st->add(@{$opt_sub}); }
+    for my $opt_sub (@opt_subs) { 
+        $st->add($opt_sub->{pattern}, $opt_sub->{substitution}); }
 
     return $st;
 }
@@ -252,17 +253,17 @@ Name of file to print template to (default: '-').
 Defines substitution $F mapping to <output_file> if not equal to '-'.
 
 =for Euclid:
-    output_file.type:       writable
+    output_file.type: writable
     output_file.default: '-'
 
-=item -s <pattern>=<sub> | --add-substitution <pattern>=<sub>
+=item -s <pattern>=<substitution> | --add-substitution <pattern>=<substitution>
 
 Define a substitution to use in the template.
 
 =for Euclid:
     repeatable
     pattern.type: /\w+/
-    sub.default: ""
+    substitution.default: ""
 
 =item -d <date-format> | --date-format [=] <date-format>
 

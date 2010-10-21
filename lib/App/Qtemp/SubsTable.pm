@@ -25,7 +25,7 @@ use Exception::Class (
 
 use App::Qtemp::QuickTemplate;
 
-our $VERSION = '0.01';
+our $VERSION = '0.0_2';
 
 use Moose;
 
@@ -54,7 +54,8 @@ sub _order_subs_ {
             push @order, _order_subs_($visited, $adj_verts_of, $dest);
         }
         elsif ($visited->{$dest} == 1) {
-            CyclicDependencies->throw("Pattern $dest is involved in a cycle");
+            CyclicDependencies->throw(
+                error => "Pattern '$dest' is involved in a cycle");
         }
         else {
             # Do nothing for cross edges.
@@ -119,7 +120,7 @@ sub compile {
 #   True iff the pattern is in the SubsTable.
 sub contains {
     my ($self, $p) = @_;
-    ValueError->throw("Pattern query is not defined.") if !defined $p;
+    ValueError->throw("Pattern query '$p' is not defined.") if !defined $p;
     return defined $self->substitutions->{$p};
 }
 
@@ -138,13 +139,17 @@ sub patterns {
 sub union {
     my ($self, $other) = @_;
 
-    CompiledTableError->throw(error => "Can't union a compiled table")
-        if $self->is_compiled || $other->is_compiled;
+    CompiledTableError->throw(
+            error => "union() called on compiled table.\n")
+        if $self->is_compiled 
+    CompiledTableError->throw(
+            error => "union() can't be given a compiled table.\n")
+        if $other->is_compiled;
 
     my %s1 = %{$self->substitutions};
 
     for my $p (keys %s1) {
-        DupPatternError->throw(error => "Tables intersect at key $p. ")
+        DupPatternError->throw(error => "Key $p exists in both tables.\n")
             if $other->contains($p);
     }
     my %u = (%s1, %{$other->substitutions});
@@ -159,13 +164,14 @@ sub union {
 sub add {
     my ($self, $patt, $sub) = @_;
 
-    ValueError->throw(error => "Pattern is not defined. ")
+    ValueError->throw(error => "Pattern '$patt' is not defined.\n")
         if !defined $patt;
-    ValueError->throw(error => "Substitution is not defined. ")
+    ValueError->throw(error => "Substitution '$sub' is not defined.\n")
         if !defined $sub;
 
     if ($self->contains($patt)) {
-        DupPatternError->throw(error => "Pattern $patt is in the SubsTable already. ");
+        DupPatternError->throw(
+            error => "Pattern '$patt' is already defined as '$sub'.\n");
     }
 
     $self->substitutions->{$patt} = $sub;
@@ -209,7 +215,7 @@ sub perform_subs {
         if ($t =~ m/\A \$ (\w+) \z/xms) {
             # print {\*STDERR} "STANDARD SUB $t\n";
             $pattern = $1;
-            NoPatternError->throw(error => "Couldn't find pattern $pattern.")
+            NoPatternError->throw(error => "Pattern '$pattern' not found.")
                 if !$self->contains($pattern);
             push @subbed, $self->substitutions->{$pattern};
         }
@@ -217,7 +223,7 @@ sub perform_subs {
         elsif ($t =~ m/\A \$ [{] ( [^{}]* | \\ [{}] ) [}] \z/xms) {
             # print {\*STDERR} "QUOTED SUB $t\n";
             $pattern = $1;
-            NoPatternError->throw(error => "Couldn't find pattern $pattern.")
+            NoPatternError->throw(error => "Pattern '$pattern' not found.")
                 if !$self->contains($pattern);
             push @subbed, $self->substitutions->{$pattern};
         }
