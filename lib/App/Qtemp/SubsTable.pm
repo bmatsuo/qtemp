@@ -141,7 +141,7 @@ sub union {
 
     CompiledTableError->throw(
             error => "union() called on compiled table.\n")
-        if $self->is_compiled 
+        if $self->is_compiled;
     CompiledTableError->throw(
             error => "union() can't be given a compiled table.\n")
         if $other->is_compiled;
