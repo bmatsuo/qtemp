@@ -18,10 +18,21 @@ our @EXPORT = qw{
 };
 
 sub glob_safe {
+
 }
+
 sub subdirs_of{
+
 }
+
 sub find_hierarchy{
+
 }
+
 sub deep_glob {
+
 }
+
+1;
+
+__END__
