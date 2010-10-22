@@ -139,7 +139,7 @@ EXAMPLES
 
         sub main {
             # PUT MAIN PROGRAM LOGIC HERE.
-        return 0;
+            return 0;
         }
 
         # PUT SUPPORTING SUBROUTINES HERE.
