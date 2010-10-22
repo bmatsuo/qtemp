@@ -29,7 +29,7 @@ ok($patts[0] eq 'FOO' && $patts[1] eq 'bar');
 
 my $st2 = App::Qtemp::SubsTable->new(substitutions => {
     "x" => "y",
-    "qux" => '$x, $bar $(echo "${FOO} ()")',});
+    "qux" => '$x, $bar $(echo -n "${FOO} ()")',});
 
 my $st3 = $st->union($st2);
 ok($st3->contains('x'));
@@ -38,4 +38,4 @@ ok(!defined $st3->compile());
 
 my $s = $st3->perform_subs('$qux, ${x}');
 # print {\*STDERR} $s, "\n";
-ok($s eq "y, baz foo ()\n, y");
+ok($s eq "y, baz foo (), y");
