@@ -220,7 +220,7 @@ sub perform_subs {
             push @subbed, $self->substitutions->{$pattern};
         }
         # Brace quoted variable substitutions (not space delimited).
-        elsif ($t =~ m/\A \$ [{] ( [^{}]* | \\ [{}] ) [}] \z/xms) {
+        elsif ($t =~ s/\A \$ [{] (.*) [}] \z/$1/xms) {
             # print {\*STDERR} "QUOTED SUB $t\n";
             $pattern = $1;
             NoPatternError->throw(error => "Pattern '$pattern' not found.")
@@ -228,7 +228,7 @@ sub perform_subs {
             push @subbed, $self->substitutions->{$pattern};
         }
         # System command substiution (after substituting on strings).
-        elsif ($t =~ m/\A \$ [(] ( [^()]* | \\ [()] ) [)] \z/xms) {
+        elsif ($t =~ s/\A \$ [(] (.*) [)] \z/$1/xms) {
             # print {\*STDERR} "SYSTEM SUB $t\n";
             $pattern = $1;
             my $x = $self->perform_subs($pattern);
@@ -272,20 +272,49 @@ sub _tokenize_ {
 
 
         my $pattern;
+        my $must_match = 0;
+        my $big_token = "";
         # Standard variable substitution
         if ($str =~ m/\G (\$ \w+) /gcxms) {
             # print {\*STDERR} "STANDARD\n";
             push @tokens, $1;
         }
         # Brace quoted variable substitutions (not space delimited).
-        elsif ($str =~ m/\G ( \$ [{] (?: [^{}] | \\ [{}] )* [}] ) /gcxms) {
+        elsif ($str =~ m/\G ( \$ [{] (?: [^}] | \\ [}] )* [}] ) /gcxms) {
             # print {\*STDERR} "QUOTED\n";
             push @tokens, $1;
         }
         # System command substiution (after substituting on strings).
-        elsif ($str =~ m/\G ( \$ [(] (?: [^()] | \\ [()] )* [)] )/gcxms) {
+        elsif ($str =~ m/\G ( \$ [(] )/gcxms) {
             # print {\*STDERR} "SYSTEM\n";
-            push @tokens, $1;
+            $must_match = 1;
+            $big_token = $1;
+            # Parens must be balanced or otherwise escaped
+            while ($must_match >= 1) {
+                my $add_to_token = "";
+                if ($str =~ m/\G \z/gcxms) {
+                    SubsParseError->throw(error => "Unterminated '('.\n");
+                }
+                elsif ($str =~ m/\G ([^()]*) /gcxms) {
+                    $add_to_token .= $1;
+                }
+                elsif ($str =~ m/\G \\ ([()]) /xms) {
+                    $add_to_token .= $1;
+                }
+                elsif ($str =~ m/\G [(]/gcxms) {
+                    $add_to_token .= '(';
+                    ++$must_match;
+                }
+                elsif ($str =~ m/\G [)]/gcxms) {
+                    $add_to_token .= ')';
+                    --$must_match;
+                }
+                else {
+                    SubsParseError->throw(error => "Error parsing '$big_token...'.\n");
+                }
+                $big_token .= $add_to_token;
+            }
+            push @tokens, $big_token;
         }
         elsif ($str =~ m/\G (\$ \W)/gcxms) {
             InvalidTokenError->throw(error => "Invalid token $1 found.");
