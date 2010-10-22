@@ -3,7 +3,7 @@ Makefile.PL
 MANIFEST
 README
 INSTALL
-t/Qtemp-SubsTable.pm
+t/Qtemp-SubsTable.t
 t/Qtemp-Template.t
 t/Qtemp-DirUtils.t
 lib/App/Qtemp/Template.pm

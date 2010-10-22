@@ -23,8 +23,6 @@ use Exception::Class (
     'DupPatternError',
 );
 
-use App::Qtemp::QuickTemplate;
-
 our $VERSION = '0.0_3';
 
 use Moose;
@@ -352,6 +350,7 @@ sub subtable_from {
             $prepend = $sub_line ;
         }
         else {
+            chomp $sub_line;
             push @joined, $sub_line;
         }
     }

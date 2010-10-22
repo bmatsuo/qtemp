@@ -20,17 +20,15 @@ use Time::Local;
 
 # Include some CPAN modules;
 use Getopt::Euclid qw{ :vars<opt_> };
-# I should probably remove Readonly.
-use Readonly; 
 
 use App::Qtemp::DirUtils;
 use App::Qtemp::SubsTable;
 use App::Qtemp::Template;
 
 # Fetch some basic program information
-Readonly my $prog_incantation  => $0;
-Readonly my $prog_dir          => dirname($0);
-Readonly my $prog_name         => basename($0);
+my $prog_incantation  = $0;
+my $prog_dir          = dirname($0);
+my $prog_name         = basename($0);
 
 ########################################################################
 # GLOBAL VARIABLES
@@ -46,22 +44,22 @@ my %opt = %ARGV;    # Command line options/arguments.
 
 
 # A temporary fix until I figure out MakeMaker (DON'T USE "~")
-Readonly my $PREFIX             => '/home/bryan';
-Readonly my $BIN_DIR            => $PREFIX.'/bin';
-Readonly my $SUPPORT_DIR        => $PREFIX.'/share/qtemp';
+my $PREFIX             = '/home/bryan';
+my $BIN_DIR            = $PREFIX.'/bin';
+my $SUPPORT_DIR        = $PREFIX.'/share/qtemp';
 
 # Standard directory for templates accessible to all users.
-Readonly my $template_dir       => $SUPPORT_DIR.'/templates';
-Readonly my $subs_dir           => $SUPPORT_DIR.'/subs';
+my $template_dir       = $SUPPORT_DIR.'/templates';
+my $subs_dir           = $SUPPORT_DIR.'/subs';
 
 # Root directory for user specific template and subs files.
-Readonly my $user_qtemp_dir     => '~/.qtemp';
-Readonly my $user_templates     => "$user_qtemp_dir/templates";
-Readonly my $user_subs          => "$user_qtemp_dir/subs";
+my $user_qtemp_dir     = '~/.qtemp';
+my $user_templates     = "$user_qtemp_dir/templates";
+my $user_subs          = "$user_qtemp_dir/subs";
 
 # Lists of locations to look for template/subs files.
-Readonly my @template_search_locations  => ($user_templates, $template_dir);
-Readonly my @subs_search_locations => ($user_subs, $subs_dir);
+my @template_search_locations  = ($user_templates, $template_dir);
+my @subs_search_locations = ($user_subs, $subs_dir);
 
 ########################################################################
 # MAIN FUNCTION
