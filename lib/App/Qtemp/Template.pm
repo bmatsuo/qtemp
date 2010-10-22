@@ -163,18 +163,21 @@ sub subbed_script {
 sub write_subbed {
     my ($self, $subs_table, $filename) = @_;
 
-    my $file = \*STDOUT;
+    my $file;
     my $output_is_file = defined $filename;
     if ($output_is_file) {
         # Open the destination file for writing.
-        open $file, ">", $filename or TemplateOpenError->throw(
+        open $file, ">", $filename 
+            or TemplateOpenError->throw(
                 error => "Can't open $filename for writing.\n");
 
         # Add a filename substitution into the SubsTable.
         $subs_table->add("FILE", $filename);
     }
 
-    print {$file} $self->subbed_template($subs_table);
+    
+    print {$output_is_file ? $file : \*STDOUT} 
+        $self->subbed_template($subs_table);
 
     # Attempt to execute the template's script if writing to a file.
     if ($output_is_file) {
@@ -186,7 +189,7 @@ sub write_subbed {
         my @cmds = split "\n", $script;
         @cmds = grep { $_ !~ m/\A \s* \z/xms } @cmds;
         for my $cmd (@cmds) {
-            print "$cmd\n";
+            print {\*STDOUT} "$cmd\n";
             if (system($cmd) != 0) {
                 TemplateScriptError->throw(
                     error => "Error running template script; $?\n");
