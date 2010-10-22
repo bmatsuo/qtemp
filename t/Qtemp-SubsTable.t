@@ -29,7 +29,7 @@ ok($patts[0] eq 'FOO' && $patts[1] eq 'bar');
 
 my $st2 = App::Qtemp::SubsTable->new(substitutions => {
     "x" => "y",
-    "qux" => '$x, $bar $(echo -n "${FOO} ()")',});
+    "qux" => '$x, $bar $(bash -c "echo -n \"${FOO} ()\"")',});
 
 my $st3 = $st->union($st2);
 ok($st3->contains('x'));
