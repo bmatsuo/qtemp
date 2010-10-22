@@ -47,7 +47,6 @@ my %opt = %ARGV;    # Command line options/arguments.
 my $PREFIX             = '/home/bryan';
 my $BIN_DIR            = $PREFIX.'/bin';
 my $SUPPORT_DIR        = $PREFIX.'/share/qtemp';
-
 # Standard directory for templates accessible to all users.
 my $template_dir       = $SUPPORT_DIR.'/templates';
 my $subs_dir           = $SUPPORT_DIR.'/subs';
