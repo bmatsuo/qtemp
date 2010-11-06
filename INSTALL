@@ -1,9 +1,11 @@
-qtemp version 0.05
+qtemp version 00.01_00
 ==========================
 
-This program is designed to run on Mac OS X and Linux. I suspect that
-there will be problems on Windows due to carriage returns. There has just
-never been any testing on Windows.
+This program is designed to run on Mac OS X and Linux. It has been
+tested under OS X Leopard with a default installation of perl (5.8.9).
+It has also been tested on ubuntu 10.04 (perl 5.10).
+I suspect that there will be problems on Windows due to carriage returns. 
+There has just never been any testing on Windows.
 
 INSTALLATION
 
@@ -14,8 +16,8 @@ To install this module type the following:
    make test
    make install
 
-If you want to install to somewhere other than /usr/local/bin (and
-/usr/local/lib), then use the following commands instead.
+If you want to install to somewhere other than /usr/local,
+then use the following commands instead.
 
    perl Makefile.PL PREFIX=/alternate/install/prefix
    make
