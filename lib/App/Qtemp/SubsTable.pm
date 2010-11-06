@@ -1,5 +1,59 @@
 #!/usr/bin/env perl
 
+package App::Qtemp::Token;
+use Moose;
+
+has 'val' => (isa => 'Str', is => 'rw', default => q{});
+
+package App::Qtemp::Token::String;
+use Moose;
+extends 'App::Qtemp::Token';
+
+package App::Qtemp::Token::Sub;
+use Moose;
+extends 'App::Qtemp::Token';
+
+#TODO: Let 'key' be given as an alternate argument to 'val'
+
+sub key {
+    my $self = shift;
+    my $k = shift;
+    if ($k) {
+        $self->val($k);
+        return;
+    }
+    return $self->val;
+}
+
+package App::Qtemp::Token::SPipe;
+use Moose;
+extends 'App::Qtemp::Token';
+
+#TODO: Let 'call' be given as an alternate argument to 'val'
+sub call {
+    my $self = shift;
+    my $c = shift;
+    if ($c) {
+        $self->val($c);
+        return;
+    }
+    return $self->val;
+}
+
+package App::Qtemp::Token::Import;
+use Moose;
+extends 'App::Qtemp::Token';
+
+sub filename {
+    my $self = shift;
+    my $f = shift;
+    if ($f) {
+        $self->val($f);
+        return
+    }
+    return $self->val;
+}
+
 package App::Qtemp::SubsTable;
 
 use strict;
@@ -248,25 +302,36 @@ sub perform_subs {
 # Returns: Return the token of $str for parsing and compiling.
 sub _tokenize_ {
     my ($self, $str) = @_;
+    my @token_objs;
     my @tokens;
     my $dollar = '$';
     TOKENIZE:
     while (1) {
+        if ($str =~ m/\G ([^$dollar']*) ' ((?: [^'] | \\ ['])*) '/gcxms) { 
+            push @tokens, "$1'$2'" if $1;
+            push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
+            push @token_objs, App::Qtemp::Token::String->new(val => $2) if $2;
+            # print {\*STDERR} "SINGLE QUOTE\n";
+            next TOKENIZE; 
+        }
+        if ($str =~ m/\G ([^$dollar']*) ' ((?: [^'] | \\ ['])*) \z/gcxms) { 
+            # print {\*STDERR} "UNMATCHED SINGLE QUOTE\n";
+            SubsParseError->throw(error => qq{Unmatched single quote ' after\n"$1'$2"});
+            next TOKENIZE; 
+        }
+        
         if ($str =~ m/\G ([^$dollar]*) \${2} /gcxms) { 
             push @tokens, $1 if $1;
             push @tokens, '$$';
+            push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
+            push @token_objs, App::Qtemp::Token::Sub->new(val => '$');
             # print {\*STDERR} "DOUBLE DOLLAR\n";
-            next TOKENIZE; 
-        }
-
-        if ($str =~ m/\G ([^$dollar]* ' (?: [^'] | \\ [']) ')/gcxms) { 
-            push @tokens, $1;
-            # print {\*STDERR} "SINGLE QUOTE\n";
             next TOKENIZE; 
         }
 
         if ($str =~ m/\G ([^$dollar]+) /gcxms) {
             push @tokens, $1;
+            push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
             # print {\*STDERR} "NOTHING\n";
             next TOKENIZE;
         }
@@ -279,11 +344,13 @@ sub _tokenize_ {
         if ($str =~ m/\G (\$ \w+) /gcxms) {
             # print {\*STDERR} "STANDARD\n";
             push @tokens, $1;
+            push @token_objs, App::Qtemp::Token::Sub->new(val => $1);
         }
         # Brace quoted variable substitutions (not space delimited).
         elsif ($str =~ m/\G ( \$ [{] (?: [^}] | \\ [}] )* [}] ) /gcxms) {
             # print {\*STDERR} "QUOTED\n";
             push @tokens, $1;
+            push @token_objs, App::Qtemp::Token::Sub->new(val => $1);
         }
         # System command substiution (after substituting on strings).
         elsif ($str =~ m/\G ( \$ [(] )/gcxms) {
@@ -316,6 +383,7 @@ sub _tokenize_ {
                 $big_token .= $add_to_token;
             }
             push @tokens, $big_token;
+            push @token_objs, App::Qtemp::Token::SPipe->new(val => $big_token);
         }
         elsif ($str =~ m/\G (\$ \W)/gcxms) {
             InvalidTokenError->throw(error => "Invalid token $1 found.");
@@ -324,6 +392,7 @@ sub _tokenize_ {
         elsif ($str =~ m/\G (.+) \z/gcxms) {
             # print {\*STDERR} "ELSE\n";
             push @tokens, $1;
+            push @token_objs, App::Qtemp::Token::String->new(val => $1);
         }
         else {
             # We must be at the end of the string.
