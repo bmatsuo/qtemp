@@ -230,7 +230,9 @@ sub perform_subs {
             # print {\*STDERR} "SYSTEM SUB $t\n";
             $pattern = $1;
             my $x = $self->perform_subs($pattern);
-            push @subbed, qx{$x};
+            my $exec_output = qx{$x};
+            $exec_output =~ s/\n+\z//xms;
+            push @subbed, $exec_output;
             # TODO: Check exitcode of backtick system call.
         }
         else { 
