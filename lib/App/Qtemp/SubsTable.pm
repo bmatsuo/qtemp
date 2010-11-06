@@ -243,46 +243,30 @@ sub perform_subs {
     my @subbed;
     return if !$self->is_compiled;
 
+    my $pattern;
     my $dollar = '$';
 
     DOSUBSTITUTION:
     for my $t ($self->_tokenize_($str)) {
-        if ($t eq q{}) { 
-            # print {\*STDERR} "EMPTY TOKEN\n";
-            next DOSUBSTITUTION; 
+        if (!$t->isa('App::Qtemp::Token')) {
+            ValueError->throw(val => "Non-Token object found in token list. $t\n");
         }
-        if ($t !~ m/\A \$ /xms) { 
-            # The token does not need substitution.
-            # print {\*STDERR} "NO SUB TOKEN $t\n";
-            push @subbed, $t;
-            next DOSUBSTITUTION; }
-        if ($t =~ s/\A \${2} \z/\$/xms) { 
-            # print {\*STDERR} "DOLLAR SIGN SUB $t\n";
-            push @subbed, '$';
-            next DOSUBSTITUTION; }
-
-        # THIS IS NOT WORKING WITH A 'gc' FLAG ON THE REGEX!!!
-        my $pattern;
-        # Standard variable substitution
-        if ($t =~ m/\A \$ (\w+) \z/xms) {
-            # print {\*STDERR} "STANDARD SUB $t\n";
-            $pattern = $1;
-            NoPatternError->throw(error => "Pattern '$pattern' not found.")
-                if !$self->contains($pattern);
-            push @subbed, $self->substitutions->{$pattern};
+        elsif ($t->isa('App::Qtemp::Token::String')) {
+            push @subbed, $t->val;
         }
-        # Brace quoted variable substitutions (not space delimited).
-        elsif ($t =~ s/\A \$ [{] (.*) [}] \z/$1/xms) {
-            # print {\*STDERR} "QUOTED SUB $t\n";
-            $pattern = $1;
-            NoPatternError->throw(error => "Pattern '$pattern' not found.")
-                if !$self->contains($pattern);
-            push @subbed, $self->substitutions->{$pattern};
+        elsif ($t->isa('App::Qtemp::Token::Sub')) {
+            if ($t->val eq '$') {
+                push @subbed, $t->val;
+            }
+            else {
+                $pattern = $t->val;
+                NoPatternError->throw(error => "Pattern '$pattern' not found.")
+                    if !$self->contains($pattern);
+                push @subbed, $self->substitutions->{$pattern};
+            }
         }
-        # System command substiution (after substituting on strings).
-        elsif ($t =~ s/\A \$ [(] (.*) [)] \z/$1/xms) {
-            # print {\*STDERR} "SYSTEM SUB $t\n";
-            $pattern = $1;
+        elsif ($t->isa('App::Qtemp::Token::SPipe')) {
+            $pattern = $t->val;
             my $x = $self->perform_subs($pattern);
             my $exec_output = qx{$x};
             $exec_output =~ s/\n+\z//xms;
@@ -308,7 +292,6 @@ sub _tokenize_ {
     TOKENIZE:
     while (1) {
         if ($str =~ m/\G ([^$dollar']*) ' ((?: [^'] | \\ ['])*) '/gcxms) { 
-            push @tokens, "$1'$2'" if $1;
             push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
             push @token_objs, App::Qtemp::Token::String->new(val => $2) if $2;
             # print {\*STDERR} "SINGLE QUOTE\n";
@@ -321,8 +304,6 @@ sub _tokenize_ {
         }
         
         if ($str =~ m/\G ([^$dollar]*) \${2} /gcxms) { 
-            push @tokens, $1 if $1;
-            push @tokens, '$$';
             push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
             push @token_objs, App::Qtemp::Token::Sub->new(val => '$');
             # print {\*STDERR} "DOUBLE DOLLAR\n";
@@ -330,7 +311,6 @@ sub _tokenize_ {
         }
 
         if ($str =~ m/\G ([^$dollar]+) /gcxms) {
-            push @tokens, $1;
             push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
             # print {\*STDERR} "NOTHING\n";
             next TOKENIZE;
@@ -341,24 +321,22 @@ sub _tokenize_ {
         my $must_match = 0;
         my $big_token = "";
         # Standard variable substitution
-        if ($str =~ m/\G (\$ \w+) /gcxms) {
+        if ($str =~ m/\G \$ (\w+) /gcxms) {
             # print {\*STDERR} "STANDARD\n";
-            push @tokens, $1;
             push @token_objs, App::Qtemp::Token::Sub->new(val => $1);
         }
         # Brace quoted variable substitutions (not space delimited).
-        elsif ($str =~ m/\G ( \$ [{] (?: [^}] | \\ [}] )* [}] ) /gcxms) {
+        elsif ($str =~ m/\G \$ [{] ( (?: [^}] | \\ [}] )* ) [}] /gcxms) {
             # print {\*STDERR} "QUOTED\n";
-            push @tokens, $1;
             push @token_objs, App::Qtemp::Token::Sub->new(val => $1);
         }
         # System command substiution (after substituting on strings).
-        elsif ($str =~ m/\G ( \$ [(] )/gcxms) {
+        elsif ($str =~ m/\G \$ [(] /gcxms) {
             # print {\*STDERR} "SYSTEM\n";
             $must_match = 1;
-            $big_token = $1;
+            $big_token = q{};
             # Parens must be balanced or otherwise escaped
-            while ($must_match >= 1) {
+            while ($must_match > 0) {
                 my $add_to_token = "";
                 if ($str =~ m/\G \z/gcxms) {
                     SubsParseError->throw(error => "Unterminated '('.\n");
@@ -370,22 +348,21 @@ sub _tokenize_ {
                     $add_to_token .= $1;
                 }
                 elsif ($str =~ m/\G [(]/gcxms) {
-                    $add_to_token .= '(';
                     ++$must_match;
+                    $add_to_token .= '(';
                 }
                 elsif ($str =~ m/\G [)]/gcxms) {
-                    $add_to_token .= ')';
                     --$must_match;
+                    $add_to_token .= ')' if $must_match > 0;
                 }
                 else {
                     SubsParseError->throw(error => "Error parsing '$big_token...'.\n");
                 }
                 $big_token .= $add_to_token;
             }
-            push @tokens, $big_token;
             push @token_objs, App::Qtemp::Token::SPipe->new(val => $big_token);
         }
-        elsif ($str =~ m/\G (\$ \W)/gcxms) {
+        elsif ($str =~ m/\G \$ (\W)/gcxms) {
             InvalidTokenError->throw(error => "Invalid token $1 found.");
         }
         # Just chew up the rest of the string
@@ -399,7 +376,7 @@ sub _tokenize_ {
             last TOKENIZE;
         }
     }
-    return @tokens;
+    return @token_objs;
 }
 
 # Subroutine: subtable_from($filename)
