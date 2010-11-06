@@ -2,7 +2,7 @@
 
 # Use perldoc or option --man to read documentation
 
-our $VERSION = 0.06;
+our $VERSION = 00.01_00;
 
 # TODO: add documentation to the .qtemp template format
 #   Then add options to view documentation and search the template
@@ -79,7 +79,10 @@ sub main {
     # Find the template.
     my $template = find_and_open_template($opt_template_name);
   
-    $template->write_subbed($sub_table, ($opt_output eq '-' ? () : ($opt_output)));
+    $template->write_subbed(
+        subs => $sub_table, 
+        ($opt_output eq '-' ? () : (file => $opt_output)),
+        ($opt{'-n'} ? (trim => 1) : (trim => 0)));
 
     exit($exitcode);
 }
@@ -215,7 +218,7 @@ qtemp - quick template generator
 
 =head1 VERSION
 
-This documentation refers to qtemp version 0.06
+This documentation refers to qtemp version 00.01_00
 Originally created on 02/06/10 23:44:17
 
 =head1 USAGE
@@ -269,6 +272,12 @@ Specify the date format to use in the special $D date substitution.
 =for Euclid:
     date-format.default: '%D %T'
 
+=item -n
+
+Trim any trailing newlines from the end of the template.
+This is useful for piping a template into a program like 
+xclip (or pbcopy), inline in vim, ...
+
 =item --version
 
 =item --usage
@@ -284,14 +293,14 @@ Print the usual program information
 =head1 DESCRIPTION
 
 qtemp is a template managing program. It is currently used generally to
-quickly create new scripts (perl, python, ...). It can also be used in
-conjunction with vim to insert templates for new functions/subroutines
-into a file being editted.
+quickly create new scripts (perl, python, ...) and tex files. 
+It can also be used in conjunction with vim to insert templates for new 
+functions/subroutines into a file being editted.
 
 qtemp prints templates either to STDOUT or to a file.
 
-Templates can have substitution variables in them, which allow custom 
-information (e.g. filename, creation date, etc.) to be inserted into the 
+Templates can have substitution patterns in them, which allow custom 
+information (e.g. filename, creation date, ...) to be inserted into the 
 template at the time of generation.
 
 When templates are written to a file, the template can also specify
@@ -301,37 +310,35 @@ control system.
 
 =head1 TEMPLATES
 
-Templates can be added by placing them in any (possibly nested)
+Templates can be added to qtemp by placing them in any (possibly nested)
 subdirectory of a searched template directory.
 
-Templates can contain macro substitutions. A macro substitution is denoted
-by a dollar sign ('$') in a template, followed by curly braces ('{','}')
-enclosing the macro name. A macro name must start with either an aphabetic
-character ('a-z' or 'A-Z') or underscore ('_').  The rest of the 
-characters can be either alphanumeric or underscores.  The curly braces 
-can be omitted from a macro substitution if the macro name only consists 
-of one character (not a recommended practice). Macro substitutions are 
-defined in substitution or '.subs' files.  Environment variables can 
-also be used as in macro substitutions if a macro with the same name 
-was not previously defined.
+Templates can contain three sections, 
+seperated by a line containing only '!!\n'.
+These sections are:
+=over
+=item Local substitution definitions.
+=item Template content containing substitutions.
+=item Shell script code to execute after writing to a file.
+=back
 
-A single line with only two exclaimation marks denotes the end of the
-template. The remaining lines of the template file are treated as a shell
-script and executed when the template is written to a file. Pattern
-substitution can be performed in the script as well.
+When all three sections are given, they must be given in the above order.
+If two sections are given, CURRENTLY, the first is assumed to be a template,
+and the second a shell script.
+If only one section is given, it is assumed to be a template.
 
 =head1 SUBSTITUTIONS
 
-String substitutions to be made in templates can be defined in .subs files
-and placed in a searched subs directory.
+Pattern substitutions to be made in templates can be defined in .subs files
+and placed in a searched subs directory (~/.qtemp/subs).
 
 Substitutions are defined one-per-line in a .subs file.
 
-A substitution definition consists of a single word X (the
-substitution name) followed directly by an equal sign. The remaining 
-characters on the line of a substitution definition (minus the newline 
-character) are used as the substition string for the pattern $X (or ${X}
-if X is more than one character).
+A substitution definition consists of string X, the substitution name,
+imediately followed by an equal sign '='. 
+The remaining characters on the line of a substitution (mod the newline character) 
+are used as the substition string for the pattern ${X}, 
+or $X if X is not a single word (contains space(s) or symbol(s)).
 
 =head1 SPECIAL SUBSTITUTIONS
 
@@ -340,20 +347,17 @@ when qtemp starts execution.
 
 =over
 
-=item
-$$
+=item $$
 
 This patern expands to a single dollar sign '$'. This is useful when you
 actually want a dollar sign in the template.
 
-=item
-$F
+=item $FILE
 
 When writing the template to a file with the -o option, this pattern
 expands to the name of the file being written to.
 
-=item
-$D
+=item $DATE
 
 This pattern will expand to the date in a short form. 
 
@@ -361,22 +365,32 @@ For example: 02/06/10 23:44:17
 
 =back
 
+=head1 SHELL PIPE SUBSTITUTIONS
+
+qtemp allows templates to pipe shell commands in-line using a pipe substitution.
+A pipe substitution has the form '$(<shell command>)'.
+The standard output stream of <shell command> will be used as the substitution 
+string in this case.
+
 =head1 EXAMPLES
 
 An example template for a perl program follows:
 
-    #!/usr/bin/perl
-    # Filename: $F
+    #!$(which perl)
+    # Filename: $FILE
     # Author: ${AUTHOR}
-    # Created: $D
+    # Created: $DATE
+
+    our $$VERSION = '00.00_01';
 
     sub main {
 
+        return 0;
     }
 
-    exit(main())
+    exit(main());
     !!
-    chmod +x $F
+    chmod +x $FILE
 
 An example substitution file might look like the following:
 
@@ -384,13 +398,30 @@ An example substitution file might look like the following:
     EMAIL=bryan.matsuo@gmail.com
     AUTHOR=${NAME} <${EMAIL}>
 
+Using these two files together produce an executable like this:
+
+    #!/usr/bin/perl
+
+    # Filename: new_perl_script.pl
+    # Author: Bryan Matsuo <bryan.matsuo@gmail.com>
+    # Created: 02/06/10 23:44:17
+
+    our $VERSION = '00.00_01';
+
+    sub main {
+
+        return 0;
+    }
+
+    exit(main());
+
 =head1 AUTHOR
 
 Bryan Matsuo <bryan.matsuo@gmail.com>
 
 =head1 BUGS
 
-=head1 COPYRIGHT & LISCENCE
+=head1 COPYRIGHT & LICENSE
 
 Copyright (C) 2010 by Bryan Matsuo
 

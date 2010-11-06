@@ -1,163 +1,164 @@
+QTEMP(1)              User Contributed Perl Documentation             QTEMP(1)
+
+
+
 NAME
-       qtemp - quick template generator
+       qtemp − quick template generator
 
 VERSION
-       This documentation refers to qtemp version 0.06 Originally created on
-       02/06/10 23:44:17
+       This documentation refers to qtemp version 00.01_00 Originally created
+       on 02/06/10 23:44:17
 
 USAGE
        qtemp [options] <template_name>
 
 REQUIRED ARGUMENTS
        <template_name>
-           Name of template to use (i.e. 'perl' uses template 'perl.qtemp').
+           Name of template to use (i.e. ’perl’ uses template ’perl.qtemp’).
 
 OPTIONS
-       -f <sub_file> | --file [=] <sub_file>
+       −f <sub_file> | −−file [=] <sub_file>
            Specify a file with custom substitutions to use.
 
-       -o <output_file> | --output [=] <output_file>
-           Name of file to print template to (default: '-').  Defines
-           substitution $F mapping to <output_file> if not equal to '-'.
+       −o <output_file> | −−output [=] <output_file>
+           Name of file to print template to (default: ’−’).  Defines
+           substitution $F mapping to <output_file> if not equal to ’−’.
 
-       -s <pattern>=<sub> | --add-substitution <pattern>=<sub>
+       −s <pattern>=<substitution> | −−add−substitution
+       <pattern>=<substitution>
            Define a substitution to use in the template.
 
-       -d <date-format> | --date-format [=] <date-format>
+       −d <date−format> | −−date−format [=] <date−format>
            Specify the date format to use in the special $D date substitution.
 
-       --version
-       --usage
-       --help
-       --man
+       −n  Trim any trailing newlines from the end of the template.  This is
+           useful for piping a template into a program like xclip (or pbcopy),
+           inline in vim, ...
+
+       −−version
+       −−usage
+       −−help
+       −−man
            Print the usual program information
 
 DESCRIPTION
-    qtemp is a template generating program. It is currently used mostly to
-    quickly create new scripts (perl, python, ...). It can also be used in
-    conjunction with vim to insert templates for new functions/subroutines
-    comment blocks, common code segments, etc. into an open file.
+       qtemp is a template managing program. It is currently used generally to
+       quickly create new scripts (perl, python, ...) and tex files.  It can
+       also be used in conjunction with vim to insert templates for new
+       functions/subroutines into a file being editted.
 
-    qtemp prints templates either to STDOUT or to a file.
+       qtemp prints templates either to STDOUT or to a file.
 
-    Templates can have substitution variables in them, which allow custom
-    information (e.g. filename, creation date, etc.) to be inserted into
-    the template at the time of generation.
+       Templates can have substitution patterns in them, which allow custom
+       information (e.g. filename, creation date, ...) to be inserted into the
+       template at the time of generation.
 
-    When templates are written to a file, the template can also specify
-    commands to execute after writing. This could include running chmod on
-    script files, or perhaps adding and making an initial commit in a
-    version control system.
+       When templates are written to a file, the template can also specify
+       commands to execute after writing. This could include running chmod on
+       script files, or perhaps adding and making an initial commit in a
+       version control system.
 
 TEMPLATES
-    Templates can be added by placing them in any (possibly nested)
-    subdirectory of ~/.qtemp/templates.
+       Templates can be added to qtemp by placing them in any (possibly
+       nested) subdirectory of a searched template directory.
 
-    There can be multiple segments to a qtemp template. The segments are
-    separated by a single line containing '!!'. 
+       Templates can contain three sections, seperated by a line containing
+       only ’!!\n’.  These sections are: =over =item Local substitution
+       definitions.  =item Template content containing substitutions.  =item
+       Shell script code to execute after writing to a file.  =back
 
-    There is always a 'text section' containing the template text. If
-    there is second second, following the text section, it is assumed to
-    be a shell script that should be run after the template is written to a
-    file.
-
-    A third section can be added before the text section to define any
-    substitutions local to the template. See the examples a couple
-    sections below for more information.
+       When all three sections are given, they must be given in the above
+       order.  If two sections are given, CURRENTLY, the first is assumed to
+       be a template, and the second a shell script.  If only one section is
+       given, it is assumed to be a template.
 
 SUBSTITUTIONS
-    String substitutions to be made in templates can be defined in .subs
-    files and placed in a searched subs directory.
+       Pattern substitutions to be made in templates can be defined in .subs
+       files and placed in a searched subs directory (~/.qtemp/subs).
 
-    Substitutions are defined one-per-line in a .subs file.
+       Substitutions are defined one‐per‐line in a .subs file.
 
-    A substitution definition consists of a string (the 'pattern') 
-    followed directly by an equal sign. The remaining characters on
-    the line of a substitution definition (minus the newline character) are
-    used as the substition string for the $<pattern> if the pattern is a word
-    (alphanumeric and '_'), or ${<pattern>} if the pattern is more than
-    one word or uses other symbols.
+       A substitution definition consists of string X, the substitution name,
+       imediately followed by an equal sign ’=’.  The remaining characters on
+       the line of a substitution (mod the newline character) are used as the
+       substition string for the pattern ${X}, or $X if X is not a single word
+       (contains space(s) or symbol(s)).
 
 SPECIAL SUBSTITUTIONS
-    There are a number of special substitutions that are defined by default
-    when qtemp starts execution.
+       There are a number of special substitutions that are defined by default
+       when qtemp starts execution.
 
-    $$ This patern expands to a single dollar sign '$'. This is useful
-        when you actually want a dollar sign in the template.
+       $$  This patern expands to a single dollar sign ’$’. This is useful
+           when you actually want a dollar sign in the template.
 
-    $FILE When writing the template to a file with the -o option, this
-        pattern expands to the name of the file being written to.
+       $FILE
+           When writing the template to a file with the −o option, this
+           pattern expands to the name of the file being written to.
 
-    $DATE This pattern will expand to the date in a short form.
-        For example: 02/06/10 23:44:17
+       $DATE
+           This pattern will expand to the date in a short form.
+
+           For example: 02/06/10 23:44:17
+
+SHELL PIPE SUBSTITUTIONS
+       qtemp allows templates to pipe shell commands in‐line using a pipe
+       substitution.  A pipe substitution has the form ’$(<shell command>)’.
+       The standard output stream of <shell command> will be used as the
+       substitution string in this case.
 
 EXAMPLES
-    An example substitution file might look like the following:
+       An example template for a perl program follows:
 
-        NAME=Bryan Matsuo
-        EMAIL=bryan.matsuo@gmail.com
-        AUTHOR=${NAME} <${EMAIL}>
+           #!$(which perl)
+           # Filename: $FILE
+           # Author: ${AUTHOR}
+           # Created: $DATE
 
-    The substitution files should be saved with a '.subs' extension in the
-    '~/.qtemp/subs/' directory
+           our $$VERSION = '00.00_01';
 
-    Here is a simple example template for perl programs:
+           sub main {
 
-        PERL BIN=/usr/bin/perl
-        !!
-        #!${PERL BIN}
-        # Filename: $FILE
-        # Author: $AUTHOR
-        # Created: $DATE
+               return 0;
+           }
 
-        # PUT GLOBAL VARIABLE DEFINITIONS HERE.
+           exit(main());
+           !!
+           chmod +x $FILE
 
-        sub main {
-            # PUT MAIN PROGRAM LOGIC HERE.
-        return 0;
-        }
+       An example substitution file might look like the following:
 
-        # PUT SUPPORTING SUBROUTINES HERE.
+           NAME=Bryan Matsuo
+           EMAIL=bryan.matsuo@gmail.com
+           AUTHOR=${NAME} <${EMAIL}>
 
-        exit(main())
-        !!
-        chmod +x $FILE
+       Using these two files together produce an executable like this:
 
-    When run with the command
+           #!/usr/bin/perl
 
-        qtemp perl -o new_prog.perl
+           # Filename: new_perl_script.pl
+           # Author: Bryan Matsuo <bryan.matsuo@gmail.com>
+           # Created: 02/06/10 23:44:17
 
-    This makes qtemp create an executable script 'new_prog.perl' with the
-    contents that look like this:
+           our $VERSION = '00.00_01';
 
-        #!/usr/bin/perl
-        # Filename: new_prog.perl
-        # Author: Bryan Matsuo <bryan.matsuo@gmail.com>
-        # Created: 02/06/10 23:44:17
+           sub main {
 
-        # PUT GLOBAL VARIABLE DEFINITIONS HERE.
+               return 0;
+           }
 
-        sub main {
-            # PUT MAIN PROGRAM LOGIC HERE.
-            return 0;
-        }
-
-        # PUT SUPPORTING SUBROUTINES HERE.
-
-        exit(main())
-
-    That's pretty much all there is too it.
+           exit(main());
 
 AUTHOR
-
-    Bryan Matsuo <bryan.matsuo@gmail.com> (Primary author)
+       Bryan Matsuo <bryan.matsuo@gmail.com>
 
 BUGS
+COPYRIGHT & LICENSE
+       Copyright (C) 2010 by Bryan Matsuo
 
-COPYRIGHT & LISCENCE
+       This library is free software; you can redistribute it and/or modify it
+       under the same terms as Perl itself, either Perl version 5.10.0 or, at
+       your option, any later version of Perl 5 you may have available.
 
-Copyright (c) 2010 by Bryan Matsuo
 
-This library is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself, either Perl version 5.10.0 or, at
-your option, any later version of Perl 5 you may have available.
+
+perl v5.8.9                       2010‐11‐06                          QTEMP(1)

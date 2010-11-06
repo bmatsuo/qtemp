@@ -112,7 +112,8 @@ sub parse_template_string {
     return App::Qtemp::Template->new(%templ);
 }
 
-# Subroutine: $template->subbed_template($subs_table)
+# Subroutine: 
+#   $template->subbed_template($subs_table[, $trim_newlines])
 # Type: INSTANCE METHOD
 # Purpose: 
 #   Perform substitutions on the template string.
@@ -122,14 +123,18 @@ sub parse_template_string {
 # Returns: A copy of the template string with substitutions performed.
 sub subbed_template {
     my $self = shift;
-
     my $subs_table = shift;
+    my $trim_newlines = shift;
+
     my $total_subs 
         = defined $subs_table ? $self->local_subs->union($subs_table)
         : $self->local_subs;
     $total_subs->compile;
 
-    return $total_subs->perform_subs($self->templ_str);
+    my $template = $self->templ_str;
+    $template =~ s/ \n+ \z //xms if ($trim_newlines);
+
+    return $total_subs->perform_subs($template);
 }
 
 # Subroutine: $template->subbed_script($subs_table)
@@ -155,14 +160,19 @@ sub subbed_script {
     return $total_subs->perform_subs($script);
 }
 
-# Subroutine: $template->write_subbed($subs_table [, $filename])
+# Subroutine: 
+#   $template->write_subbed(
+#       subs => $sub_table,
+#       [trim => $trim_newlines,]
+#       [file => $filename,])
 # Type: INSTANCE METHOD
 # Purpose: Write the subbed template to a file and execute the script.
 #   Writes to standard output if a filename is not given.
 # Returns: Nothing.
 sub write_subbed {
-    my ($self, $subs_table, $filename) = @_;
-
+    my ($self, %arg) = @_;
+    my ($subs_table, $trim_newlines, $filename)
+        = ($arg{subs}, $arg{trim}, $arg{file});
     my $file;
     my $output_is_file = defined $filename;
     if ($output_is_file) {
@@ -177,7 +187,7 @@ sub write_subbed {
 
     
     print {$output_is_file ? $file : \*STDOUT} 
-        $self->subbed_template($subs_table);
+        $self->subbed_template($subs_table, $trim_newlines);
 
     # Attempt to execute the template's script if writing to a file.
     if ($output_is_file) {
