@@ -4,7 +4,6 @@ package App::Qtemp::SubsTable;
 
 use strict;
 use warnings;
-use Carp;
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
 our @ISA;
@@ -17,6 +16,7 @@ use Exception::Class (
     'InvalidTokenError',
     'FileIOError',
     'SubsParseError',
+    'UnexpectedTokenError',
     'CompiledTableError',
     'CyclicDependencies',
     'NoPatternError',
@@ -236,7 +236,8 @@ sub perform_subs {
             # TODO: Check exitcode of backtick system call.
         }
         else { 
-            croak("Unexpected token $t encounted during substitutions.");
+            UnexpectedTokenError->throw(
+                error => "Unexpected token $t encounted during substitutions.");
         }
     }
     return (join q{}, @subbed);
