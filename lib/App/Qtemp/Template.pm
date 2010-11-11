@@ -10,6 +10,7 @@ use AutoLoader qw(AUTOLOAD);
 our @ISA;
 push @ISA, 'Exporter';
 
+use App::Qtemp::Parser;
 use App::Qtemp::SubsTable;
 
 use Exception::Class (
@@ -24,10 +25,8 @@ use Moose;
 
 has 'local_subs' 
     => (isa => 'App::Qtemp::SubsTable', is => 'rw', default => sub { {} });
-has 'templ_str'
-    => (isa => 'Str', is => 'rw', required => 1);
-has 'script'
-    => (isa => 'Str', is => 'rw', default => q{});
+has 'template' => (isa => 'ArrayRef', is => 'rw', default => sub { [] });
+has 'script' => (isa => 'ArrayRef[TObj]', is => 'rw', default => sub { [] });
 
 # Subroutine: read_template_file($filename)
 # Type: INTERFACE SUB
@@ -53,60 +52,16 @@ sub read_template_file {
 sub parse_template_string {
     my $str = shift;
 
-    # Divide the string into sections.
-    my @sections = split "\n!!\n", $str;
-    my $num_sections = scalar @sections;
-    if (@sections > 3) {
-        TemplateFormatError->throw(
-            error => "Found $num_sections sections; expects no more than 3.\n");
-    }
+    my $template = parse_template($str);
 
     my %templ = (
         local_subs => App::Qtemp::SubsTable->new(),
-        templ_str => q{},
-        script => q{},);
+        template => $template->{contents},
+        script => $template->{script},);
 
-    # Handle the local substitution definitions if there are any.
-    if ($num_sections == 3) {
-        my $subs_section = shift @sections;
-        my @sub_defs = split "\n", $subs_section;
-
-        # Create a substitution hash.
-        my %sub;
-        my $prepend;
-        for my $sub_line (@sub_defs) {
-            if (defined $prepend) { $sub_line = $prepend.$sub_line; }
-
-            if ($sub_line =~ m/ \\ \z/xms) {
-                $prepend = "$sub_line\n";
-                next;
-            }
-            else {
-                $prepend = undef;
-                my ($patt, $sub) = split "=", $sub_line, 2;
-                if (!defined $sub) {
-                    TemplateFormatError->throw(
-                        error => "Malformed substitution $sub_line"
-                            . "(perhaps missing '='?).\n");
-                }
-                $sub{$patt} = $sub
-            }
-        }
-
-        # Create a SubsTable with local substitutions.
-        my $sub_table = App::Qtemp::SubsTable->new(substitutions => \%sub);
-        $templ{local_subs} = $sub_table;
-    }
-
-    # Handle the template section.
-    my $template_section = shift @sections;
-    $template_section .= "\n";
-    $templ{templ_str} = $template_section;
-
-    # Handle the script template, if one exists.
-    if ($num_sections > 1) {
-        my $script_templ_section= shift @sections;
-        $templ{script} = $script_templ_section;
+    for my $s (@{$template->{sub_defs}}) {
+        my ($key, $contents) = ($s->{key}, $s->{contents});
+        $templ{local_subs}->_add_($key, $contents);
     }
 
     return App::Qtemp::Template->new(%templ);
@@ -131,10 +86,11 @@ sub subbed_template {
         : $self->local_subs;
     $total_subs->compile;
 
-    my $template = $self->templ_str;
-    $template =~ s/ \n+ \z //xms if ($trim_newlines);
+    my $template = $self->template;
+    my $res = $total_subs->_perform_subs_($template);
+    $res =~ s/ \n+ \z //xms if ($trim_newlines);
 
-    return $total_subs->perform_subs($template);
+    return $res;
 }
 
 # Subroutine: $template->subbed_script($subs_table)
@@ -155,9 +111,9 @@ sub subbed_script {
     $total_subs->compile;
 
     my $script = $self->script;
-    $script = q{} if !defined $script;
+    $script = [] if !defined $script;
 
-    return $total_subs->perform_subs($script);
+    return $total_subs->_perform_subs_($script);
 }
 
 # Subroutine: 

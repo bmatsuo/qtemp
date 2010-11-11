@@ -58,6 +58,8 @@ package App::Qtemp::SubsTable;
 
 use strict;
 use warnings;
+use Data::Dumper;
+use App::Qtemp::Parser;
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
 our @ISA;
@@ -82,7 +84,7 @@ our $VERSION = '0.0_3';
 use Moose;
 
 has 'substitutions' 
-    => (isa => 'HashRef[Str]', is => 'rw', default => sub { {} });
+    => (isa => 'HashRef', is => 'rw', default => sub { {} });
 has 'is_compiled'
     => (isa => 'Bool', is => 'rw', default => 0);
 
@@ -133,12 +135,11 @@ sub compile {
     for my $p (@patterns) {
         # Handle the substitution and get its tokens.
         my $s = $self->substitutions->{$p};
-        my @s_tokens = $self->_tokenize_($s);
-        
-        my @simple_deps = map {m/\A \$ (\w+)/xms ? ($1) : ()} @s_tokens;
-        my @quoted_deps = map {m/\A \$ [{] ([^}]+) [}]/xms ? ($1) : ()} @s_tokens;
+        #print {\*STDERR} "Checking dependencies of '$s'.\n";
+        my @dependencies = (map {($_->dependent_subs)} @{$s});
+
         my %s_is_dep_of;
-        for my $dep (@simple_deps, @quoted_deps) {
+        for my $dep (@dependencies) {
             $s_is_dep_of{$dep} = 1;
         }
 
@@ -159,7 +160,7 @@ sub compile {
     # Do substitutions in a dependency first method.
     $self->is_compiled(1);
     for my $p (@sub_order) {
-        $self->substitutions->{$p} = $self->perform_subs($self->substitutions->{$p});
+        $self->substitutions->{$p} = $self->_perform_subs_($self->substitutions->{$p});
     }
 
     return;
@@ -209,12 +210,35 @@ sub union {
     return App::Qtemp::SubsTable->new(substitutions => \%u);
 }
 
+# Subroutine: $subtable->_add_($pattern, $substitution)
+# Type: INSTANCE METHOD
+# Purpose: Add a single pattern substitution into a table.
+# Returns: Nothing.
+sub _add_ {
+    my ($self, $patt, $sub) = @_;
+
+    CompiledTableError->throw(
+            error => "add() called on compiled table.\n")
+        if $self->is_compiled;
+
+    if ($self->contains($patt)) {
+        DupPatternError->throw(
+            error => "Pattern '$patt' is already defined as '$sub'.\n");
+    }
+
+    $self->substitutions->{$patt} = $sub;
+}
+
 # Subroutine: $subtable->add($pattern, $substitution)
 # Type: INSTANCE METHOD
 # Purpose: Add a single pattern substitution into a table.
 # Returns: Nothing.
 sub add {
     my ($self, $patt, $sub) = @_;
+
+    CompiledTableError->throw(
+            error => "add() called on compiled table.\n")
+        if $self->is_compiled;
 
     ValueError->throw(error => "Pattern '$patt' is not defined.\n")
         if !defined $patt;
@@ -226,10 +250,64 @@ sub add {
             error => "Pattern '$patt' is already defined as '$sub'.\n");
     }
 
-    $self->substitutions->{$patt} = $sub;
+    $self->substitutions->{$patt} = parse_sub_contents($sub);
+}
+
+### INTERNAL UTILITY
+# Subroutine: _perform_subs_
+# Usage: $self->_perform_subs_( $token_array_ref )
+# Purpose: Perform substitutions on a tokenized string.
+# Returns: A Perl string, with substitutions performed.
+# Throws: ValueErrors when dependency problems arise.
+sub _perform_subs_ {
+    my $self = shift;
+    my $tokens_ref = shift;
+
+    my $s = "";
+    for my $t (@{$tokens_ref}) {
+        if ($t->isa('TStr')) {
+            $s .= $t->{val};
+        }
+        elsif ($t->isa('TSub')) {
+            my $k = $t->{key};
+            #print {\*STDERR} "Performing sub, $k\n";
+            if ($k eq '$') {
+                $s .= '$';
+                next;
+            }
+            my $rep_str = $self->substitutions->{$k};
+            if (ref $rep_str eq q{}) {
+                #print {\*STDERR} "Substituting for, $rep_str\n";
+                $s .= $rep_str;
+            }
+            else {
+                ValueError->throw(error=>"Unexpected reference $rep_str.\n");
+            }
+        }
+        elsif ($t->isa('TPipe')) {
+            my $command = $self->_perform_subs_($t->{contents});
+            my $exec_output = qx{$command};
+            $exec_output =~ s/\n+\z//xms;
+            $s .= $exec_output;
+        }
+        elsif ($t->isa('TCondSub')) {
+            my $k = $t->{key};
+            if ($self->contains($k)) {
+                $s .= $self->_perform_subs_($t->{$t->{negated} ? 'false_contents' : 'true_contents'});
+            }
+            else {
+                $s .= $self->_perform_subs_($t->{$t->{negated} ? 'true_contents' : 'false_contents'});
+            }
+        }
+        else {
+            ValueError->throw(error=>"Unrecognized token $t.\n");
+        }
+    }
+    return $s;
 
     return;
 }
+
 
 # Subroutine: $sub_table->perform_subs($str)
 # Type: INSTANCE METHOD
@@ -239,145 +317,36 @@ sub add {
 #   A copy of the string with substitutions performed.
 sub perform_subs {
     my ($self, $str) = @_;
-
-    my @subbed;
     return if !$self->is_compiled;
-
-    my $pattern;
-    my $dollar = '$';
-
-    DOSUBSTITUTION:
-    for my $t ($self->_tokenize_($str)) {
-        if (!$t->isa('App::Qtemp::Token')) {
-            ValueError->throw(val => "Non-Token object found in token list. $t\n");
-        }
-        elsif ($t->isa('App::Qtemp::Token::String')) {
-            push @subbed, $t->val;
-        }
-        elsif ($t->isa('App::Qtemp::Token::Sub')) {
-            if ($t->val eq '$') {
-                push @subbed, $t->val;
-            }
-            else {
-                $pattern = $t->val;
-                NoPatternError->throw(error => "Pattern '$pattern' not found.")
-                    if !$self->contains($pattern);
-                push @subbed, $self->substitutions->{$pattern};
-            }
-        }
-        elsif ($t->isa('App::Qtemp::Token::SPipe')) {
-            $pattern = $t->val;
-            my $x = $self->perform_subs($pattern);
-            my $exec_output = qx{$x};
-            $exec_output =~ s/\n+\z//xms;
-            push @subbed, $exec_output;
-            # TODO: Check exitcode of backtick system call.
-        }
-        else { 
-            UnexpectedTokenError->throw(
-                error => "Unexpected token $t encounted during substitutions.");
-        }
-    }
-    return (join q{}, @subbed);
+    my $tokens_ref = parse_sub_contents($str);
+    return $self->_perform_subs_($tokens_ref);
 }
 
-# Subroutine: $substable->_tokenize_($str)
-# Type: INSTANCE METHOD
-# Returns: Return the token of $str for parsing and compiling.
-sub _tokenize_ {
-    my ($self, $str) = @_;
-    my @token_objs;
-    my @tokens;
-    my $dollar = '$';
-    TOKENIZE:
-    while (1) {
-        if ($str =~ m/\G ([^$dollar']*) ' ((?: [^'] | \\ ['])*) '/gcxms) { 
-            push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
-            push @token_objs, App::Qtemp::Token::String->new(val => $2) if $2;
-            # print {\*STDERR} "SINGLE QUOTE\n";
-            next TOKENIZE; 
-        }
-        if ($str =~ m/\G ([^$dollar']*) ' ((?: [^'] | \\ ['])*) \z/gcxms) { 
-            # print {\*STDERR} "UNMATCHED SINGLE QUOTE\n";
-            SubsParseError->throw(error => qq{Unmatched single quote ' after\n"$1'$2"});
-            next TOKENIZE; 
-        }
-        
-        if ($str =~ m/\G ([^$dollar]*) \${2} /gcxms) { 
-            push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
-            push @token_objs, App::Qtemp::Token::Sub->new(val => '$');
-            # print {\*STDERR} "DOUBLE DOLLAR\n";
-            next TOKENIZE; 
-        }
+### INTERFACE SUB/INTERNAL UTILITY
+# Subroutine: subtable_from_string
+# Usage: subtable_from_string( $str )
+# Purpose: Create a subtable from a string description.
+# Returns: Nothing
+# Throws: Nothing
+sub subtable_from_string {
+    my $subs_text = shift;
+    my $subs_ref = parse_subs($subs_text);
 
-        if ($str =~ m/\G ([^$dollar]+) /gcxms) {
-            push @token_objs, App::Qtemp::Token::String->new(val => $1) if $1;
-            # print {\*STDERR} "NOTHING\n";
-            next TOKENIZE;
-        }
+    my %sub;
+    for my $subdef (@{$subs_ref}) {
+        my ($patt, $sub_contents) = ($subdef->{key}, $subdef->{contents});
 
+        #SubsParseError->throw(error => "Can't parse subline:\n$subdef\n")
+        #    if (!defined $substr);
+        #print {\*STDERR} "Substitution '$patt' found; ";
+        #print {\*STDERR} Dumper $sub_contents;
 
-        my $pattern;
-        my $must_match = 0;
-        my $big_token = "";
-        # Standard variable substitution
-        if ($str =~ m/\G \$ (\w+) /gcxms) {
-            # print {\*STDERR} "STANDARD\n";
-            push @token_objs, App::Qtemp::Token::Sub->new(val => $1);
-        }
-        # Brace quoted variable substitutions (not space delimited).
-        elsif ($str =~ m/\G \$ [{] ( (?: [^}] | \\ [}] )* ) [}] /gcxms) {
-            # print {\*STDERR} "QUOTED\n";
-            push @token_objs, App::Qtemp::Token::Sub->new(val => $1);
-        }
-        # System command substiution (after substituting on strings).
-        elsif ($str =~ m/\G \$ [(] /gcxms) {
-            # print {\*STDERR} "SYSTEM\n";
-            $must_match = 1;
-            $big_token = q{};
-            # Parens must be balanced or otherwise escaped
-            while ($must_match > 0) {
-                my $add_to_token = "";
-                if ($str =~ m/\G \z/gcxms) {
-                    SubsParseError->throw(error => "Unterminated '('.\n");
-                }
-                elsif ($str =~ m/\G ([^()]*) /gcxms) {
-                    $add_to_token .= $1;
-                }
-                elsif ($str =~ m/\G \\ ([()]) /xms) {
-                    $add_to_token .= $1;
-                }
-                elsif ($str =~ m/\G [(]/gcxms) {
-                    ++$must_match;
-                    $add_to_token .= '(';
-                }
-                elsif ($str =~ m/\G [)]/gcxms) {
-                    --$must_match;
-                    $add_to_token .= ')' if $must_match > 0;
-                }
-                else {
-                    SubsParseError->throw(error => "Error parsing '$big_token...'.\n");
-                }
-                $big_token .= $add_to_token;
-            }
-            push @token_objs, App::Qtemp::Token::SPipe->new(val => $big_token);
-        }
-        elsif ($str =~ m/\G \$ (\W)/gcxms) {
-            InvalidTokenError->throw(error => "Invalid token $1 found.");
-        }
-        # Just chew up the rest of the string
-        elsif ($str =~ m/\G (.+) \z/gcxms) {
-            # print {\*STDERR} "ELSE\n";
-            push @tokens, $1;
-            push @token_objs, App::Qtemp::Token::String->new(val => $1);
-        }
-        else {
-            # We must be at the end of the string.
-            last TOKENIZE;
-        }
+        $sub{$patt} = $sub_contents;
     }
-    return @token_objs;
+
+    return App::Qtemp::SubsTable->new(substitutions => \%sub);
 }
+
 
 # Subroutine: subtable_from($filename)
 # Type: INTERFACE SUB
@@ -385,36 +354,13 @@ sub _tokenize_ {
 # Returns: A new subtable.
 sub subtable_from {
     my $filename = shift;
+
     open my $fh, "<", $filename
         or FileIOError->throw(error => "Can't open subs file $filename.");
-    my @lines = <$fh>;
-    my @joined;
-    my $prepend;
-    for my $i (0 .. scalar @lines) {
-        my $sub_line = $lines[$i];
-        next if !defined $sub_line || $sub_line =~ /\A \s* \z/xms;
-        $sub_line = $prepend . $sub_line if defined $prepend;
-        $prepend = undef;
-        if ($sub_line =~ s/\\ \n \z/\n/xms) {
-            $prepend = $sub_line ;
-        }
-        else {
-            chomp $sub_line;
-            push @joined, $sub_line;
-        }
-    }
+    my $subs_text = do {local $/; <$fh>};
+    close $fh;
 
-    my %sub;
-    for my $subdef (@joined) {
-        my ($patt, $substr) = split '=', $subdef, 2;
-
-        SubsParseError->throw(error => "Can't parse subline:\n$subdef\n")
-            if (!defined $substr);
-
-        $sub{$patt} = $substr;
-    }
-
-    return App::Qtemp::SubsTable->new(substitutions => \%sub);
+    return subtable_from_string($subs_text);
 }
 
 return 1;

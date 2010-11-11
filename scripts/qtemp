@@ -100,7 +100,10 @@ sub main {
 sub mk_substitution_table {
     # Create a default substitution table.
     my %def_subs = default_subs($opt{'--date-format'});
-    my $st = App::Qtemp::SubsTable->new(substitutions => \%def_subs);
+    my $st = App::Qtemp::SubsTable->new();
+    for my $p (keys %def_subs) {
+        $st->add($p, $def_subs{$p});
+    }
 
     # Add substitutions from .subs files in ~/.qtemp/subs
     my @sub_files = find_subs_files();

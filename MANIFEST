@@ -6,7 +6,9 @@ INSTALL
 t/Qtemp-SubsTable.t
 t/Qtemp-Template.t
 t/Qtemp-DirUtils.t
+t/Qtemp-Parser.t
 lib/App/Qtemp/Template.pm
 lib/App/Qtemp/SubsTable.pm
+lib/App/Qtemp/Parser.pm
 lib/App/Qtemp/DirUtils.pm
 scripts/qtemp

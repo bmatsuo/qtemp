@@ -5,8 +5,8 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 5;
-BEGIN { use_ok('App::Qtemp::Template') };
+use Test::More tests => 1;
+BEGIN { use_ok('App::Qtemp::Parser') };
 use App::Qtemp::SubsTable;
 
 #########################
@@ -15,7 +15,7 @@ use App::Qtemp::SubsTable;
 # Insert your test code below, the Test::More module is use()ed here so read
 # its man page ( perldoc Test::More ) for help writing this test script.
 my $t1 = <<'EOT';
-x="3"
+x=3
 !!
 This file is $x.
 5x
@@ -25,10 +25,3 @@ cat $x
 chmod +x $FILE
 
 EOT
-
-my $no_sub_table = App::Qtemp::SubsTable->new(substitutions => {'FILE' => [bless {val => 'test_file'}, 'TStr']});
-my $temp = parse_template_string($t1);
-ok(defined $temp->local_subs);
-ok(defined $temp->template);
-ok(defined $temp->script);
-ok($temp->subbed_script($no_sub_table) =~ m/\A \n cat \s 3 \nchmod \s [+]x \s test_file \n \n\z/xms);
