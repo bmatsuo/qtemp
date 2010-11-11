@@ -278,6 +278,9 @@ sub _perform_subs_ {
             my $rep_str = $self->substitutions->{$k};
             if (ref $rep_str eq q{}) {
                 #print {\*STDERR} "Substituting for, $rep_str\n";
+                if (!defined $rep_str) {
+                    NoPatternError->throw(error=>"No pattern $k defined.\n");
+                }
                 $s .= $rep_str;
             }
             else {
