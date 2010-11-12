@@ -102,7 +102,12 @@ push @ISA, 'Exporter';
 #   moving things directly into @EXPORT or @EXPORT_OK will save memory.
 our %EXPORT_TAGS = ( all => [ qw( ) ] );
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{all} } );
-our @EXPORT = qw{parse_template parse_subs parse_sub_contents};
+our @EXPORT = qw{
+    parse_template 
+    parse_template_file
+    parse_subs 
+    parse_subs_file
+    parse_sub_contents};
 
 
 $Parse::RecDescent::skip='';
@@ -333,7 +338,8 @@ sub extract_script {
 
 sub parse_template {
     my $text = shift;
-    defined $tparser->Template($text) or die "Couldn't parse template.";
+    defined $tparser->Template($text) 
+        or die "Couldn't parse template.\n$template\n";
     for my $s (@{$template->{subdefs}}) {
         
     }
@@ -343,13 +349,32 @@ sub parse_template {
     return $template;
 }
 
+sub parse_template_file {
+    my $f = shift;
+    open my $fh, "<", $f
+        or die "Couldn't open file $f.";
+    my $cont = do {local $/; <$fh>};
+    close $fh;
+    return parse_template($cont);
+}
+
 sub parse_subs {
     my $text = shift;
-    defined $tparser->SubstitutionList($text) or die "Couldn't parse substitutions.";
+    defined $tparser->SubstitutionList($text) 
+        or die "Couldn't parse substitutions.\n$text\n";
     for my $s (@{$subs_ref}) {
         compress_strings($s->{contents});
     }
     return $subs_ref;
+}
+
+sub parse_subs_file {
+    my $f = shift;
+    open my $fh, "<", $f
+        or die "Couldn't open file $f.";
+    my $cont = do {local $/; <$fh>};
+    close $fh;
+    return parse_subs($cont);
 }
 
 sub parse_sub_contents {

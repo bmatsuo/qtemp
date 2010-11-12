@@ -74,17 +74,14 @@ my @subs_search_locations = ($user_subs, $subs_dir);
 # Returns: 
 #   Does not return. Exit is called after all other commands.
 sub main {
-    # Make the substitution table.
-    my $sub_table = mk_substitution_table();
-
-    # Initialize the template library.
+    # Initialize the template/subs libraries.
     initialize_library();
 
     # Find the template.
     my $template = open_template($opt_template_name);
   
     $template->write_subbed(
-        subs => $sub_table, 
+        subs => subs_library(), 
         ($opt_output eq '-' ? () : (file => $opt_output)),
         ($opt{'-n'} ? (trim => 1) : (trim => 0)));
 
@@ -102,37 +99,22 @@ sub main {
 # Returns: Nothing
 # Throws: Nothing
 sub initialize_library {
-    for my $d (@template_search_locations) { add_to_library($d); }
-    return;
-}
+    # Initialize the template library.
+    for my $d (@template_search_locations) { add_to_template_library($d); }
 
-# Subroutine: mk_substitution_table()
-# Type: INTERNAL UTILITY
-# Purpose: 
-#   Load defaults, user defined subs files and command line specified
-#   substitutions in that order (last loaded is highest priority).
-# Returns: A new hash containing all substitutions
-sub mk_substitution_table {
-    # Create a default substitution table.
-    my %def_subs = default_subs($opt{'--date-format'});
-    my $st = App::Qtemp::SubsTable->new();
-    for my $p (keys %def_subs) {
-        $st->add($p, $def_subs{$p});
-    }
+    # Initialize the subs library.
+    
+    my %def_subs = default_subs($opt{'--date-format'}); # Default subs.
+    for my $p (keys %def_subs) { add_to_subs_library($p, $def_subs{$p}); }
 
-    # Add substitutions from .subs files in ~/.qtemp/subs
-    my @sub_files = find_subs_files();
-    for my $sub_file (@sub_files) {
-        my $file_st = subtable_from($sub_file);
-        $st = $st->union($file_st);
-    }
-
-    # Add command-line specified substitutions.
-    my @opt_subs = @{$opt{'--add-substitution'} || []};
+    my @opt_subs = @{$opt{'--add-substitution'} || []}; # Optional subs.
     for my $opt_sub (@opt_subs) { 
-        $st->add($opt_sub->{pattern}, $opt_sub->{substitution}); }
+        add_to_subs_library(map {$opt_sub->{$_}} qw{pattern substitution}) }
 
-    return $st;
+    # .subs files in standard locations.
+    for my $d (@subs_search_locations) { add_to_subs_library($d); }
+
+    return;
 }
 
 # Subroutine: default_subs(), default_subs($date_format)
@@ -154,30 +136,6 @@ sub default_subs {
     my %sub_defaults = %sub_default_constants;
 
     return %sub_defaults;
-}
-
-# Subroutine: find_subs_files()
-# Type: INTERNAL UTILITY
-# Purpose: 
-#   Gather all substitution files to read into the substitution table.
-# Returns: List
-#   All locatable substition filenames.
-sub find_subs_files {
-    # Find .qtsubs files in standard search locations
-    my @subs_files;
-    for my $subs_root (@subs_search_locations) {
-        push @subs_files, grep {m/ \.subs \z/xms} find_hierarchy($subs_root);
-    }
-
-    # Add any command-line specified files second to give high priority.
-    push @subs_files, @{$opt{'--file'}} if defined $opt{'--file'};
-
-    if (!@subs_files) {
-        print {\*STDERR} "Didn't find any .subs files.\n";
-    }
-
-    # Return the list of subs files.
-    return @subs_files;
 }
 
 # Finally, kickstart the script

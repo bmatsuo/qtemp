@@ -8,7 +8,14 @@ use warnings;
 use Carp;
 use File::Basename;
 use App::Qtemp::DirUtils;
+use App::Qtemp::Parser;
 use App::Qtemp::Template;
+use App::Qtemp::SubsTable;
+
+use Exception::Class (
+    'UnknownTemplateException',
+    'AmbiguousTemplateException',
+);
 
 our $VERSION = "0.0_1";
 
@@ -24,10 +31,17 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw{
     open_template
     template_named 
-    add_to_library};
+    add_to_template_library
+    add_to_subs_library
+    subs_library
+};
 
-my @searched;
+my @searched_for_templates;
 my %template_path;
+
+my @searched_for_subs;
+my %subs_path;
+my $subs_library = App::Qtemp::SubsTable->new();
 
 ### INTERFACE SUB
 # Subroutine: template_named
@@ -36,7 +50,9 @@ my %template_path;
 #   Search the template library for a template named $tname.
 #   For example template_named( 'perl-lib' ).
 # Returns: A string if the template is found. Undef otherwise.
-# Throws: Nothing
+# Throws: 
+#   UnknownTemplateException when no template is found.
+#   AmbiguousTemplateException when multiple templates are found.
 sub template_named {
     my $tname = shift;
     my @matching_templates
@@ -44,9 +60,13 @@ sub template_named {
             basename($_) =~ /\A $tname\.qtemp\z /xms;
         } keys %template_path;
     my $num_matching = scalar @matching_templates;
-    if ($num_matching == 0) { return; }
+    if ($num_matching == 0) { UnknownTemplateException->throw(
+        error => "No template with name $tname" ); }
     elsif ($num_matching == 1) { return $matching_templates[0]; }
-    else { return; } # TODO: Throw an exception.
+    else { AmbiguousTemplateException->throw(
+        error => join( "\n    ", 
+            "Multiple matches for $tname:", 
+            @matching_templates ) . "\n"); } 
 }
 
 # Subroutine: open_template($tname)
@@ -58,30 +78,19 @@ sub template_named {
 #   An undefined value if no template by that name is found.
 sub open_template {
     my ($tmpl_name) = @_;
-
-    my $template_path = template_named($tmpl_name);
-
-    # Ensure that the template was found.
-    croak(
-        sprintf "%s\n", 
-            join("\n\t","Couldn't find template $tmpl_name in", @searched)
-    ) if !defined $template_path;
-
-    # Read and return the template.
-    my $template = read_template_file($template_path);
-    return $template;
+    return read_template_file( template_named( $tmpl_name ) );
 }
 
 ### INTERFACE SUB
-# Subroutine: add_to_library
-# Usage: add_to_library( $root_dir )
+# Subroutine: add_to_template_library
+# Usage: add_to_template_library( $root_dir )
 # Purpose: 
 #   Search the directory hierarchy rooted at $root_dir for templates.
 # Returns: The number of templates added to the directory.
 # Throws: Nothing
-sub add_to_library {
+sub add_to_template_library {
     my $root_dir = shift;
-    return if grep {$_ eq $root_dir} @searched;
+    return if grep {$_ eq $root_dir} @searched_for_templates;
     my @files = find_hierarchy( $root_dir );
     my @templates = grep {$_ =~ /\.qtemp\z/xms} @files;
     my $num_added = 0;
@@ -89,8 +98,68 @@ sub add_to_library {
         ++$num_added if !defined $template_path{ $t };
         $template_path{$t} = 1 ;
     }
-    push @searched, $root_dir;
+    push @searched_for_templates, $root_dir;
     return $num_added;
+}
+
+### INTERNAL UTILITY
+# Subroutine: _add_subs_file_
+# Usage: _add_subs_file_( $subs_path )
+# Purpose: Add the subs of a single file to the subs library.
+# Returns: The number of subs added to the library.
+# Throws: Nothing
+sub _add_subs_file_ {
+    my $sp = shift;
+    my $subs_ref = parse_subs_file($sp);
+    my $num_added = 0;
+    for my $s (@{$subs_ref}) { 
+        $subs_library->_add_($s->{key}, $s->{contents}); 
+        ++$num_added;
+    }
+    return $num_added;
+}
+
+### INTERFACE SUB
+# Subroutine: add_to_subs_library
+# Usage: 
+#   add_to_subs_library($pattern, $subs_string)
+#   add_to_subs_library( $root_dir )
+# Purpose: 
+#   Add a substitution to the library if two arguments are given;
+#   otherwise, search the directory hierarchy rooted at $root_dir for substitution files.
+# Returns: The number of substitution files added to the library.
+# Throws: Nothing
+sub add_to_subs_library {
+    my ($p,$s) = @_;
+    if (defined $s) {
+        $subs_library->add($p,$s);
+        return 1;
+    }
+    my $root_dir = $p;
+    return if grep {$_ eq $root_dir} @searched_for_subs;
+    my @files = find_hierarchy( $root_dir );
+    my @subs_files = grep {$_ =~ /\.subs\z/xms} @files;
+    my $num_added = 0;
+    for my $s (@subs_files) { 
+        if (!defined $subs_path{ $s }) {
+            _add_subs_file_($s);
+            ++$num_added;
+            $subs_path{$s} = 1;
+        }
+    }
+    push @searched_for_subs, $root_dir;
+    return $num_added;
+}
+
+### INTERFACE SUB
+# Subroutine: subs_library
+# Usage: subs_library( )
+# Purpose: 
+#   Retrieve an uncompiled copy of the current subtable library.
+# Returns: App::Qtemp::SubsTable object.
+# Throws: Nothing
+sub subs_library {
+    return $subs_library->dup();
 }
 
 return 1;

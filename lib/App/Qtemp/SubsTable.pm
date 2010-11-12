@@ -210,9 +210,24 @@ sub union {
     return App::Qtemp::SubsTable->new(substitutions => \%u);
 }
 
+### INSTANCE METHOD
+# Subroutine: dup
+# Usage: $subtable->dup( )
+# Purpose: Duplicate a subtable.
+# Returns: 
+#   A new App::Qtemp::SubsTable object with the same substitutions as the
+#   original instance.
+# Throws: Nothing
+sub dup {
+    my $self = shift;
+    return $self->union(App::Qtemp::SubsTable->new());
+}
+
 # Subroutine: $subtable->_add_($pattern, $substitution)
 # Type: INSTANCE METHOD
-# Purpose: Add a single pattern substitution into a table.
+# Purpose: 
+#   Helper method for adding substitutions.
+#   Accepts a pattern and an array of parsed substitution contents.
 # Returns: Nothing.
 sub _add_ {
     my ($self, $patt, $sub) = @_;
