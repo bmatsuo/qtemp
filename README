@@ -17,23 +17,33 @@ REQUIRED ARGUMENTS
            Name of template to use (i.e. ’perl’ uses template ’perl.qtemp’).
 
 OPTIONS
-       −f <sub_file> | −−file [=] <sub_file>
-           Specify a file with custom substitutions to use.
-
        −o <output_file> | −−output [=] <output_file>
            Name of file to print template to (default: ’−’).  Defines
-           substitution $F mapping to <output_file> if not equal to ’−’.
-
-       −s <pattern>=<substitution> | −−add−substitution
-       <pattern>=<substitution>
-           Define a substitution to use in the template.
-
-       −d <date−format> | −−date−format [=] <date−format>
-           Specify the date format to use in the special $D date substitution.
+           substitution $FILE mapping to <output_file> if not equal to ’−’.
 
        −n  Trim any trailing newlines from the end of the template.  This is
            useful for piping a template into a program like xclip (or pbcopy),
            inline in vim, ...
+
+       −d <date−format> | −−date−format [=] <date−format>
+           Specify the date format to use in the special $D date substitution.
+
+       −t <templ_file> | −−template−file [=] <templ_file>
+           Specify an extra template file to add to the library (not
+           necessarily the template output).  This is not really recommended
+           in most circumstances.
+
+       −T <templ_dir> | −−template−dir [=] <templ_dir>
+           Specify a directory in which to search for template files.
+
+       −s <sub_file> | −−subs−file [=] <sub_file>
+           Specify a file with custom substitutions to use.
+
+       −S <sub_dir> | −−subs−dir [=] <sub_dir>
+           Specify a directory in which to search for substitutions.
+
+       −d <patt>=<replace> | −−define <patt>=<replace>
+           Define a substitution to use in the template.
 
        −−version
        −−usage
@@ -161,4 +171,4 @@ COPYRIGHT & LICENSE
 
 
 
-perl v5.8.9                       2010‐11‐06                          QTEMP(1)
+perl v5.8.9                       2010‐11‐12                          QTEMP(1)
