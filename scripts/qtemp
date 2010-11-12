@@ -2,7 +2,7 @@
 
 # Use perldoc or option --man to read documentation
 
-our $VERSION = 00.01_00;
+our $VERSION = 00.01_03;
 
 # TODO: add documentation to the .qtemp template format
 #   Then add options to view documentation and search the template
@@ -99,21 +99,46 @@ sub main {
 # Returns: Nothing
 # Throws: Nothing
 sub initialize_library {
-    # Initialize the template library.
-    for my $d (@template_search_locations) { add_to_template_library($d); }
+    initialize_template_library();
+    initialize_subs_library();
+    return;
+}
 
-    # Initialize the subs library.
-    
+### INTERNAL UTILITY
+# Subroutine: initialize_template_library
+# Usage: initialize_template_library( )
+# Purpose: 
+#   Add templates specified via the command line, and templates in
+#   default search locations to the template library.
+# Returns: Nothing
+# Throws: Nothing
+sub initialize_template_library {
+    for my $f (@{ $opt{'--template-file'} }) { add_template_file($f); }
+    for my $d (@{ $opt{'--template-dir'} }) { add_template_file($d); }
+    for my $d (@template_search_locations) { add_template_dir($d); }
+    return;
+}
+
+### INTERNAL UTILITY
+# Subroutine: initialize_subs_library
+# Usage: initialize_subs_library( )
+# Purpose: 
+#   Add default substitutions, command line specified substitutions, and 
+#   subs files in default search locations to the subs_library.
+# Returns: Nothing
+# Throws: Nothing
+sub initialize_subs_library {
     my %def_subs = default_subs($opt{'--date-format'}); # Default subs.
-    for my $p (keys %def_subs) { add_to_subs_library($p, $def_subs{$p}); }
+    for my $p (keys %def_subs) { add_subs($p, $def_subs{$p}); }
 
-    my @opt_subs = @{$opt{'--add-substitution'} || []}; # Optional subs.
-    for my $opt_sub (@opt_subs) { 
-        add_to_subs_library(map {$opt_sub->{$_}} qw{pattern substitution}) }
+    my @opt_subs = @{ $opt{'--define'} };
+    for my $s ( @opt_subs ) { add_subs(map {$s->{$_}} qw{patt replace}) }
+
+    for my $d (@{ $opt{'--subs-file'} }) { add_subs($d) }
+    for my $d (@{ $opt{'--subs-dir'} }) { add_subs($d) }
 
     # .subs files in standard locations.
-    for my $d (@subs_search_locations) { add_to_subs_library($d); }
-
+    for my $d (@subs_search_locations) { add_subs($d); }
     return;
 }
 
@@ -170,13 +195,39 @@ Name of template to use (i.e. 'perl' uses template 'perl.qtemp').
 
 =over
 
-=item -f <sub_file> | --file [=] <sub_file>
+=item -t <templ_file> | --template-file [=] <templ_file>
+
+Specify an extra template file to add to the library 
+(not necessarily the template output). 
+This is not really recommended in most circumstances.
+
+=for Euclid:
+    repeatable
+    templ_file.type:  readable
+
+=item -T <templ_dir> | --template-dir [=] <templ_dir>
+
+Specify a directory in which to search for template files.
+
+=for Euclid:
+    repeatable
+    templ_dir.type:  readable, -d templ_dir
+
+=item -s <sub_file> | --subs-file [=] <sub_file>
 
 Specify a file with custom substitutions to use.
 
 =for Euclid:
     repeatable
     sub_file.type:  readable
+
+=item -S <sub_dir> | --subs-dir [=] <sub_dir>
+
+Specify a directory in which to search for substitutions.
+
+=for Euclid:
+    repeatable
+    sub_dir.type:  readable, -d sub_dir
 
 =item -o <output_file> | --output [=] <output_file>
 
@@ -187,14 +238,14 @@ Defines substitution $F mapping to <output_file> if not equal to '-'.
     output_file.type: writable
     output_file.default: '-'
 
-=item -s <pattern>=<substitution> | --add-substitution <pattern>=<substitution>
+=item -d <patt>=<replace> | --define <patt>=<replace>
 
 Define a substitution to use in the template.
 
 =for Euclid:
     repeatable
-    pattern.type: /\w+/
-    substitution.default: ""
+    patt.type: /\w+/
+    replace.default: ""
 
 =item -d <date-format> | --date-format [=] <date-format>
 

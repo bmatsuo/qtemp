@@ -31,8 +31,9 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw{
     open_template
     template_named 
-    add_to_template_library
-    add_to_subs_library
+    add_template_file
+    add_template_dir
+    add_subs
     subs_library
 };
 
@@ -82,22 +83,32 @@ sub open_template {
 }
 
 ### INTERFACE SUB
-# Subroutine: add_to_template_library
-# Usage: add_to_template_library( $root_dir )
+# Subroutine: add_template_file
+# Usage: add_template_file( $path )
+# Purpose: 
+#   Add a single file not in a normal search path to the template library.
+# Returns: Nothing
+# Throws: Nothing
+sub add_template_file {
+    my $tpath = shift;
+    return 0 if defined $template_path{$tpath};
+    return $template_path{$tpath} = 1;
+}
+
+### INTERFACE SUB
+# Subroutine: add_template_dir
+# Usage: add_template_dir( $root_dir )
 # Purpose: 
 #   Search the directory hierarchy rooted at $root_dir for templates.
 # Returns: The number of templates added to the directory.
 # Throws: Nothing
-sub add_to_template_library {
+sub add_template_dir {
     my $root_dir = shift;
     return if grep {$_ eq $root_dir} @searched_for_templates;
     my @files = find_hierarchy( $root_dir );
     my @templates = grep {$_ =~ /\.qtemp\z/xms} @files;
     my $num_added = 0;
-    for my $t (@templates) { 
-        ++$num_added if !defined $template_path{ $t };
-        $template_path{$t} = 1 ;
-    }
+    for my $t (@templates) { $num_added += add_template_file($t); }
     push @searched_for_templates, $root_dir;
     return $num_added;
 }
@@ -120,16 +131,16 @@ sub _add_subs_file_ {
 }
 
 ### INTERFACE SUB
-# Subroutine: add_to_subs_library
+# Subroutine: add_subs
 # Usage: 
-#   add_to_subs_library($pattern, $subs_string)
-#   add_to_subs_library( $root_dir )
+#   add_subs($pattern, $subs_string)
+#   add_subs( $root_dir )
 # Purpose: 
 #   Add a substitution to the library if two arguments are given;
 #   otherwise, search the directory hierarchy rooted at $root_dir for substitution files.
 # Returns: The number of substitution files added to the library.
 # Throws: Nothing
-sub add_to_subs_library {
+sub add_subs {
     my ($p,$s) = @_;
     if (defined $s) {
         $subs_library->add($p,$s);
