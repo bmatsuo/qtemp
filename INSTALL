@@ -1,5 +1,14 @@
-qtemp version 00.01_00
+qtemp version 00.01_03
 ==========================
+
+DEPENDENCIES
+
+This module requires these CPAN modules and libraries (www.cpan.org):
+
+    Getopt::Euclid
+    Exception::Class
+    Moose
+    Parse::RecDescent
 
 This program is designed to run on Mac OS X and Linux. It has been
 tested under OS X Leopard with a default installation of perl (5.8.9).
@@ -23,14 +32,6 @@ then use the following commands instead.
    make
    make test
    make install
-
-DEPENDENCIES
-
-This module requires these CPAN modules and libraries (www.cpan.org):
-
-    Getopt::Euclid
-    Exception::Class
-    Moose
 
 COPYRIGHT AND LICENCE
 
