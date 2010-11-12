@@ -8,6 +8,7 @@ WriteMakefile(
         'Getopt::Euclid'    => '0',
         'Moose'             => '0',
         'Exception::Class'  => '0',
+        'Parse::RecDescent' => '0',
     }, 
     EXE_FILES           => [qw{scripts/qtemp}],
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005

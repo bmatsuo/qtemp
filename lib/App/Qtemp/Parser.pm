@@ -2,11 +2,16 @@
 
 package TObj;
 sub dependent_subs { return () }
+sub dependent_templates { return () }
 package TSub;
 push @ISA, 'TObj';
 sub dependent_subs {
     my $self = shift;
     return ($self->{key});
+}
+sub dependent_templates {
+    my $self = shift;
+    return ();
 }
 package TSubDefn;
 push @ISA, 'TObj';
@@ -14,17 +19,34 @@ sub dependent_subs {
     my $self = shift;
     return (map {$_->dependent_subs} @{$self->{contents}});
 }
+sub dependent_templates {
+    my $self = shift;
+    return (map {$_->dependent_templates} @{$self->{contents}});
+}
 package TPipe;
 push @ISA, 'TObj';
 sub dependent_subs {
     my $self = shift;
     return (map {$_->dependent_subs} @{$self->{contents}});
 }
+sub dependent_templates {
+    my $self = shift;
+    return (map {$_->dependent_templates} @{$self->{contents}});
+}
 package TIncl;
 push @ISA, 'TObj';
 sub dependent_subs {
     my $self = shift;
     return (map {(map {$_->dependent_subs} $_->contents)} @{$self->{sub_defs}});
+}
+sub dependent_templates {
+    my $self = shift;
+    return (
+        $self->{name} ,
+        (   map {
+                (map {$_->dependent_templates} @{$_->contents})
+            } @{$self->{sub_defs}}),
+    );
 }
 package TCondSub;
 push @ISA, 'TObj';
@@ -35,9 +57,17 @@ sub dependent_subs {
         (map {$_->dependent_subs} @{$self->{false_contents}})
     );
 }
+sub dependent_templates {
+    my $self = shift;
+    return (
+        (map {$_->dependent_templates} @{$self->{true_contents}}),
+        (map {$_->dependent_templates} @{$self->{false_contents}})
+    );
+}
 package TStr;
 push @ISA, 'TObj';
 sub dependent_subs { return () }
+sub dependent_templates { return () }
 package TRoot;
 push @ISA, 'TObj';
 sub dependent_subs {
@@ -46,6 +76,16 @@ sub dependent_subs {
         (map {$_->dependent_subs} @{$self->{script}}),
         (map {$_->dependent_subs} @{$self->{contents}}),
         (map {(map {$_->dependent_subs} $_->{contents})} @{$self->{sub_defs}}),
+    );
+}
+sub dependent_templates {
+    my $self = shift;
+    return (
+        (map {$_->dependent_templates} @{$self->{script}}),
+        (map {$_->dependent_templates} @{$self->{contents}}),
+        (   map {
+                (map {$_->dependent_templates} $_->{contents})
+            } @{$self->{sub_defs}}),
     );
 }
 package App::Qtemp::Parser;

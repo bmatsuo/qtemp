@@ -24,6 +24,7 @@ use Getopt::Euclid qw{ :vars<opt_> };
 use App::Qtemp::DirUtils;
 use App::Qtemp::SubsTable;
 use App::Qtemp::Template;
+use App::Qtemp::Library;
 
 # Fetch some basic program information
 my $prog_incantation  = $0;
@@ -76,8 +77,11 @@ sub main {
     # Make the substitution table.
     my $sub_table = mk_substitution_table();
 
+    # Initialize the template library.
+    initialize_library();
+
     # Find the template.
-    my $template = find_and_open_template($opt_template_name);
+    my $template = open_template($opt_template_name);
   
     $template->write_subbed(
         subs => $sub_table, 
@@ -90,6 +94,17 @@ sub main {
 ########################################################################
 # SUPPORTING SUBROUTINES
 ########################################################################
+
+### INTERNAL UTILITY
+# Subroutine: initialize_library
+# Usage: initialize_library( )
+# Purpose: Initialize the template library.
+# Returns: Nothing
+# Throws: Nothing
+sub initialize_library {
+    for my $d (@template_search_locations) { add_to_library($d); }
+    return;
+}
 
 # Subroutine: mk_substitution_table()
 # Type: INTERNAL UTILITY
@@ -139,51 +154,6 @@ sub default_subs {
     my %sub_defaults = %sub_default_constants;
 
     return %sub_defaults;
-}
-
-# Subroutine: find_and_open_template($template_name)
-# Type: INTERNAL UTILITY
-# Purpose: 
-#   Find a template file name $template_name in known locations and
-#   return an open file handle reading from the template.
-# Returns: 
-#   Template filehandle Reference open for reading.
-sub find_and_open_template {
-    my ($tmpl_name) = @_;
-
-    my $path;
-
-    my @search_locations = @template_search_locations;
-    my $expected_name = "$tmpl_name.qtemp";
-
-    # look in the possible locations
-    SEARCHDIRS:
-    for my $search_dir (@search_locations) {
-        my @found_templates = grep {m/\. qtemp \z/xms} find_hierarchy($search_dir);
-        
-        # Construct a possible path of the template.
-        my @matching_templates = grep {basename($_) eq $expected_name} @found_templates;
-        if (@matching_templates) {
-            croak("Found multiple templates with name $expected_name.\n@found_templates\n")
-                if (@matching_templates > 1);
-
-            my $match = $matching_templates[0];
-            croak("Matching template $match is not readable.") 
-                if (!-r $match);
-            $path = $match;
-            last SEARCHDIRS;
-        }
-    }
-
-    # Ensure that the template was found.
-    croak(
-        "Couldn't find template $expected_name in "
-            . join(':',@search_locations)
-    ) if !defined $path;
-
-    # Read and return the template.
-    my $template = read_template_file($path);
-    return $template;
 }
 
 # Subroutine: find_subs_files()
