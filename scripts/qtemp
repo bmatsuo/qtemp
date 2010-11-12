@@ -195,6 +195,29 @@ Name of template to use (i.e. 'perl' uses template 'perl.qtemp').
 
 =over
 
+
+=item -o <output_file> | --output [=] <output_file>
+
+Name of file to print template to (default: '-').
+Defines substitution $FILE mapping to <output_file> if not equal to '-'.
+
+=for Euclid:
+    output_file.type: writable
+    output_file.default: '-'
+
+=item -n
+
+Trim any trailing newlines from the end of the template.
+This is useful for piping a template into a program like 
+xclip (or pbcopy), inline in vim, ...
+
+=item -d <date-format> | --date-format [=] <date-format>
+
+Specify the date format to use in the special $D date substitution.
+
+=for Euclid:
+    date-format.default: '%D %T'
+
 =item -t <templ_file> | --template-file [=] <templ_file>
 
 Specify an extra template file to add to the library 
@@ -229,15 +252,6 @@ Specify a directory in which to search for substitutions.
     repeatable
     sub_dir.type:  readable, -d sub_dir
 
-=item -o <output_file> | --output [=] <output_file>
-
-Name of file to print template to (default: '-').
-Defines substitution $F mapping to <output_file> if not equal to '-'.
-
-=for Euclid:
-    output_file.type: writable
-    output_file.default: '-'
-
 =item -d <patt>=<replace> | --define <patt>=<replace>
 
 Define a substitution to use in the template.
@@ -246,19 +260,6 @@ Define a substitution to use in the template.
     repeatable
     patt.type: /\w+/
     replace.default: ""
-
-=item -d <date-format> | --date-format [=] <date-format>
-
-Specify the date format to use in the special $D date substitution.
-
-=for Euclid:
-    date-format.default: '%D %T'
-
-=item -n
-
-Trim any trailing newlines from the end of the template.
-This is useful for piping a template into a program like 
-xclip (or pbcopy), inline in vim, ...
 
 =item --version
 
