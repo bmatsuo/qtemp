@@ -1,59 +1,4 @@
 #!/usr/bin/env perl
-
-package App::Qtemp::Token;
-use Moose;
-
-has 'val' => (isa => 'Str', is => 'rw', default => q{});
-
-package App::Qtemp::Token::String;
-use Moose;
-extends 'App::Qtemp::Token';
-
-package App::Qtemp::Token::Sub;
-use Moose;
-extends 'App::Qtemp::Token';
-
-#TODO: Let 'key' be given as an alternate argument to 'val'
-
-sub key {
-    my $self = shift;
-    my $k = shift;
-    if ($k) {
-        $self->val($k);
-        return;
-    }
-    return $self->val;
-}
-
-package App::Qtemp::Token::SPipe;
-use Moose;
-extends 'App::Qtemp::Token';
-
-#TODO: Let 'call' be given as an alternate argument to 'val'
-sub call {
-    my $self = shift;
-    my $c = shift;
-    if ($c) {
-        $self->val($c);
-        return;
-    }
-    return $self->val;
-}
-
-package App::Qtemp::Token::Import;
-use Moose;
-extends 'App::Qtemp::Token';
-
-sub filename {
-    my $self = shift;
-    my $f = shift;
-    if ($f) {
-        $self->val($f);
-        return
-    }
-    return $self->val;
-}
-
 package App::Qtemp::SubsTable;
 
 use strict;
@@ -69,10 +14,8 @@ our @EXPORT = qw{subtable_from};
 
 use Exception::Class (
     'ValueError',
-    'InvalidTokenError',
     'FileIOError',
     'SubsParseError',
-    'UnexpectedTokenError',
     'CompiledTableError',
     'CyclicDependencies',
     'NoPatternError',
