@@ -113,8 +113,8 @@ sub initialize_library {
 # Returns: Nothing
 # Throws: Nothing
 sub initialize_template_library {
-    for my $f (@{ $opt{'--template-file'} }) { add_template_file($f); }
-    for my $d (@{ $opt{'--template-dir'} }) { add_template_file($d); }
+    for my $f (@{ $opt{'--template-file'} || [] }) { add_template_file($f); }
+    for my $d (@{ $opt{'--template-dir'}  || [] }) { add_template_file($d); }
     for my $d (@template_search_locations) { add_template_dir($d); }
     return;
 }
@@ -131,11 +131,11 @@ sub initialize_subs_library {
     my %def_subs = default_subs($opt{'--date-format'}); # Default subs.
     for my $p (keys %def_subs) { add_subs($p, $def_subs{$p}); }
 
-    my @opt_subs = @{ $opt{'--define'} };
+    my @opt_subs = @{ $opt{'--define'} || [] };
     for my $s ( @opt_subs ) { add_subs(map {$s->{$_}} qw{patt replace}) }
 
-    for my $d (@{ $opt{'--subs-file'} }) { add_subs($d) }
-    for my $d (@{ $opt{'--subs-dir'} }) { add_subs($d) }
+    for my $d (@{ $opt{'--subs-file'} || [] }) { add_subs($d) }
+    for my $d (@{ $opt{'--subs-dir'}  || [] }) { add_subs($d) }
 
     # .subs files in standard locations.
     for my $d (@subs_search_locations) { add_subs($d); }
