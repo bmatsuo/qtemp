@@ -5,7 +5,7 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 19;
+use Test::More tests => 24;
 BEGIN { use_ok('App::Qtemp::Parser') };
 use App::Qtemp::SubsTable;
 use Data::Dumper;
@@ -82,17 +82,24 @@ ok($t->{contents}->[-2]->{contents}->[0]->{val} eq 'ls ()');
 #####################
 
 my $cond_template = <<'EOT';
+$?DATE?{Date: $DATE}
 Author: $AUTHOR
 Description: $?!desc?{Place description here.}{$desc}
 EOT
 $t = parse_template($cond_template);
 #print {\*STDERR} Dumper $t;
-my $cond = $t->{contents}->[-2];
-ok($cond->{negated} == 1);
-ok(scalar (@{$cond->{true_contents}}) == 1);
-ok(scalar (@{$cond->{false_contents}}) == 1);
-ok($cond->{false_contents}->[0]->{key} eq 'desc');
-ok($cond->{false_contents}->[0]->isa('TSub'));
+my $cond = $t->{contents}->[0];
+ok($cond->{negated} == 0);
+ok(scalar (@{$cond->{false_contents}}) == 0);
+ok(scalar (@{$cond->{true_contents}}) == 2);
+ok($cond->{true_contents}->[0]->isa('TStr'));
+ok($cond->{true_contents}->[1]->isa('TSub'));
+my $cond1 = $t->{contents}->[-2];
+ok($cond1->{negated} == 1);
+ok(scalar (@{$cond1->{true_contents}}) == 1);
+ok(scalar (@{$cond1->{false_contents}}) == 1);
+ok($cond1->{false_contents}->[0]->{key} eq 'desc');
+ok($cond1->{false_contents}->[0]->isa('TSub'));
 
 #################
 # TEST Includes #
