@@ -5,7 +5,7 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 24;
+use Test::More tests => 28;
 BEGIN { use_ok('App::Qtemp::Parser') };
 use App::Qtemp::SubsTable;
 use Data::Dumper;
@@ -105,3 +105,15 @@ ok($cond1->{false_contents}->[0]->isa('TSub'));
 # TEST Includes #
 #################
 
+my $incl_template = <<'EOT';
+Want to include $[other-template FILE="\"$FILE\"" title="Template Title"]
+EOT
+$t = parse_template($incl_template);
+my $inc = $t->{contents}->[-2];
+#print {\*STDERR} Dumper $inc;
+ok($inc->isa('TIncl'));
+my $inc_subs = $inc->{sub_defs};
+#print {\*STDERR} Dumper $inc_subs;
+ok(scalar ( @{ $inc_subs } ) == 2);
+ok(scalar ( @{ $inc_subs->[0]->{contents} } ) == 3);
+ok($inc_subs->[0]->{contents}->[0]->{val} eq q{"});

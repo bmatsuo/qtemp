@@ -299,7 +299,7 @@ sub compress_strings {
         }
         else {
             if ($c->isa('TSubDefn')) {
-                compress_strings($c->{sub_contents});
+                compress_strings($c->{contents});
             }
             elsif ($c->isa('TCondSub')) {
                 compress_strings($c->{true_contents});
@@ -347,7 +347,7 @@ sub parse_template {
     my $text = shift;
     defined $tparser->Template($text) 
         or die "Couldn't parse template.\n$template\n";
-    for my $s (@{$template->{subdefs}}) {
+    for my $s (@{$template->{sub_defs}}) {
         
     }
     compress_strings($template->{sub_defs});
