@@ -5,7 +5,7 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 11;
+use Test::More tests => 14;
 BEGIN { use_ok('App::Qtemp::Parser') };
 use App::Qtemp::SubsTable;
 use Data::Dumper;
@@ -13,6 +13,11 @@ use Data::Dumper;
 #########################
 
 my $t;
+
+###################
+# TEST SECTIONING #
+###################
+
 my $one_section_templ=<<'EOT';
 This section only has a content section.
 EOT
@@ -45,6 +50,10 @@ ok(scalar (@{$t->{contents}}) == 3);
 #ok($t->{contents}->[3]->isa('TSTerm'));
 ok(scalar (@{$t->{script}}) == 3);
 
+######################
+# TEST SUBSTITUTIONS #
+######################
+
 my $sub_template=<<'EOT';
 This is a simple $type template.
 It is for ${action}.
@@ -54,16 +63,25 @@ ok($t->{contents}->[1]->isa('TSub'));
 ok($t->{contents}->[2]->isa('TStr'));
 ok($t->{contents}->[3]->isa('TSub'));
 
-# Insert your test code below, the Test::More module is use()ed here so read
-# its man page ( perldoc Test::More ) for help writing this test script.
-my $t1 = <<'EOT';
-x=3
-!!
-This file is $x.
-5x
-!!
+##############
+# TEST PIPES #
+##############
 
-cat $x
-chmod +x $FILE
-
+my $pipe_template=<<'EOT';
+This is all the files I can see $(ls \(\))
 EOT
+$t = parse_template($pipe_template);
+ok(scalar (@{$t->{contents}}) > 1);
+#print {\*STDERR} Dumper $t->{contents};
+ok($t->{contents}->[-2]->isa('TPipe'));
+#print {\*STDERR} $t->{contents}->[-2]->{contents}->[0]->{val}, "\n";
+ok($t->{contents}->[-2]->{contents}->[0]->{val} eq 'ls ()');
+
+#####################
+# TEST CONDITIONALS #
+#####################
+
+#################
+# TEST Includes #
+#################
+

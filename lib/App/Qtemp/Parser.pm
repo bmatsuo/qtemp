@@ -147,15 +147,18 @@ my $token_set = <<'EOTOKENS';
     BANG:       /!/
     QUEST:      /\?/
     DQUOTE:     /"/
-    NODQUOTE:   /[^"]|\\\\"/
+    NODQUOTE:   /[^"]/
     LPAREN:     /\(/
     RPAREN:     /\)/
     LBRACK:     /\[/
     RBRACK:     /\]/
     LBRACE:     /\{/
     RBRACE:     /\}/
-    NORP:       /(?:[^)]|\\\\[)])/
-    NORBRACE:   /[^}]|\\\\[}]/
+    PAREN:      /\(|\)/
+    ESC:        '\\'
+    NOP:        /[^()]/
+    BRACE:      /[{}]/
+    NOBRACE:    /[^{}]/
     WILD:       /[^\$]/
 
 EOTOKENS
@@ -173,7 +176,8 @@ my $templ_rules = <<'EOTGRAMMAR';
         | ConditionalSubstitution
         | Substitution
         | Include
-        | NORP { bless {val => $item[1]}, 'TStr' }
+        | ESC PAREN { bless {val => $item[2]}, 'TStr' }
+        | NOP { bless {val => $item[1]}, 'TStr' }
 
     PipeContents: PipeComponent(s)
 
@@ -186,6 +190,7 @@ my $templ_rules = <<'EOTGRAMMAR';
         | ConditionalSubstitution
         | Substitution
         | Include
+        | ESC DQUOTE { bless {val => $item[2]}, 'TStr' }
         | NODQUOTE { bless {val => $item[1]}, 'TStr' }
 
     SubPatternContents: SubPatternComponent(s)
@@ -220,7 +225,8 @@ my $templ_rules = <<'EOTGRAMMAR';
         | ConditionalSubstitution
         | Substitution
         | Include
-        | NORBRACE { bless { val => $item[1] }, 'TStr' }
+        | ESC BRACE { bless { val => $item[2] }, 'TStr' }
+        | NOBRACE { bless { val => $item[1] }, 'TStr' }
 
     Condition: ConditionComponent(s)
 
@@ -283,6 +289,7 @@ sub compress_strings {
     for my $c (@{$_[0]}) {
         #print {\*STDERR} "Compressing ".ref ($c)."...\n";
         if ($c->isa('TStr')) {
+            #print {\*STDERR} "STR FOUND '$c->{val}'\n.";
             if ($want_to_compress) {
                 my $last_c = $components[-1];
                 $last_c->{val} = $last_c->{val}.$c->{val};
