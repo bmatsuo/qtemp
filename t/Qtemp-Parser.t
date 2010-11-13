@@ -5,7 +5,7 @@
 
 # change 'tests => 1' to 'tests => last_test_to_print';
 
-use Test::More tests => 14;
+use Test::More tests => 19;
 BEGIN { use_ok('App::Qtemp::Parser') };
 use App::Qtemp::SubsTable;
 use Data::Dumper;
@@ -80,6 +80,19 @@ ok($t->{contents}->[-2]->{contents}->[0]->{val} eq 'ls ()');
 #####################
 # TEST CONDITIONALS #
 #####################
+
+my $cond_template = <<'EOT';
+Author: $AUTHOR
+Description: $?!desc?{Place description here.}{$desc}
+EOT
+$t = parse_template($cond_template);
+#print {\*STDERR} Dumper $t;
+my $cond = $t->{contents}->[-2];
+ok($cond->{negated} == 1);
+ok(scalar (@{$cond->{true_contents}}) == 1);
+ok(scalar (@{$cond->{false_contents}}) == 1);
+ok($cond->{false_contents}->[0]->{key} eq 'desc');
+ok($cond->{false_contents}->[0]->isa('TSub'));
 
 #################
 # TEST Includes #
